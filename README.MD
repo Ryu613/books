@@ -5,4 +5,4 @@ java有部分书籍在[另外一个](https://github.com/Ryu613/java-all-in-one)�
 
 作曲作品有部分在[这个](https://github.com/Ryu613/musical-composition)项目中
 
-ai和作曲书籍暂时不更新(社畜状态-没时间)
+目前ai和作曲书籍暂时不更新(社畜-没时间)

@@ -9,3 +9,10 @@ java有部分书籍在[另外一个](https://github.com/Ryu613/java-all-in-one)�
 作曲作品有部分在[这个](https://github.com/Ryu613/musical-composition)项目中
 
 目前ai和作曲书籍暂时不更新(社畜-没时间)
+
+---
+
+正在更新中:
+1. 亿级流量网站架构核心技术 v2（二刷）
+2. C++语言导学
+3. games101

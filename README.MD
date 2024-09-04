@@ -1,4 +1,10 @@
-# books 
+# books
+
+用了几年脑图以后，还是转到了纯markdown下，主要导图不适合整理信息量大，关系较为复杂的内容，整理代码片段，公式也还是不够方便
+
+markdown内容利于组织，软件环境依赖小，内容组织更灵活，新开的坑就放在doc目录下
+
+## [跳转到新目录](doc/readme.md)
 
 > 个人读过的书籍导图整理，尽量提取书籍精粹，供自己参考，温故知新
 
@@ -9,13 +15,3 @@
 java有部分书籍在[另外一个](https://github.com/Ryu613/java-all-in-one)项目中
 
 作曲作品有部分在[这个](https://github.com/Ryu613/musical-composition)项目中
-
-
----
-
-# 值得一看的导图
-1. 高性能MySQL
-2. 深入理解Java虚拟机
-3. 软件开发者路线图
-4. effective java(推荐直接看[v2版](https://github.com/Ryu613/java-all-in-one/blob/main/book/effective-java/doc/Effective%20Java%20v2.emmx))
-5. 刻意练习

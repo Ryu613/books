@@ -255,7 +255,7 @@ pbrt系统是按照面向对象来架构的，也就是说，之前上文提到�
 
     用于在渲染过程中生成随机或准随机的样本点，决定如何对场景进行采样
 
-6. Filter(过滤器)类：
+6. Filter(滤波器)类：
 
     用于对采样后的图像进行过滤，通常是为了解决锯齿和采样噪声问题，改善最终渲染的图像质量
 
@@ -286,7 +286,7 @@ pbrt系统是按照面向对象来架构的，也就是说，之前上文提到�
 
     用于对场景中的光源进行采样，决定如何选择和使用光源进行光照计算
 
-14. Integrator (积分器)类:
+14. Integrator (集成器)类:
 
     负责执行光线追踪的核心算法，将场景的几何形状、光源、材质结合在一起计算最终的图像，控制光线传播的方式，决定如何累积和计算光线对图像的贡献
 
@@ -322,7 +322,7 @@ pbrt理论上可以分为三个阶段：
 
 3. 主渲染循环阶段：
 
-    这个阶段占了整个执行过程的大部分时间，本书的大部分代码都是在这个阶段的内容。为了更好的组织渲染过程，本书实现了一个积分器，就是为了处理和求解之前提到的渲染公式。
+    这个阶段占了整个执行过程的大部分时间，本书的大部分代码都是在这个阶段的内容。为了更好的组织渲染过程，本书实现了一个集成器，就是为了处理和求解之前提到的渲染公式。
 
 ### main函数
 
@@ -352,7 +352,7 @@ int main(int argc, char* argv[]) {
     if (Options->useGPU || Options->wavefront)
         RenderWavefront(scene);
     else
-        // 在CPU上渲染，使用Intergrator(积分器)实现，
+        // 在CPU上渲染，使用Intergrator(集成器)实现，
         // 比起wavefront并行数量低得多，根据并行的CPU线程数来决定图像采样的数量
         RenderCPU(scene);
     // 渲染后的资源清理工作
@@ -360,13 +360,13 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-### 积分器接口
+### 集成器接口
 
 在RenderCPU()中，Integrator接口的实现类会实例化一个对象来处理渲染，由于Intergrator只运行在CPU上，所以我们会定义一个Integrator基类。这个类的具体实现定义在cpu/intergrator.h和cpu/intergrator.cpp中
 
 ```C++
 /*
-	积分器接口：根据指定总体的Primitive和光源信息来渲染场景
+	集成器接口：根据指定总体的Primitive和光源信息来渲染场景
 */
 #pragma once
 
@@ -374,8 +374,8 @@ int main(int argc, char* argv[]) {
 namespace pbrt {
 	class Integrator {
 	public:
-		// 积分器必须提供渲染的实现，这个函数是无参的，当场景完成初始化后，会被RenderCPU()立刻调用
-		// 由具体的积分器实现来决定如何渲染场景
+		// 集成器必须提供渲染的实现，这个函数是无参的，当场景完成初始化后，会被RenderCPU()立刻调用
+		// 由具体的集成器实现来决定如何渲染场景
 		virtual void Render() = 0;
 		// 整合了场景里所有的几何物体的引用的特殊的Primitive
 		// 存储了所有场景中的Primitive，这些Primitive都是有加速数据结构的
@@ -416,13 +416,92 @@ namespace pbrt {
 }
 ```
 
-### 图块积分器与主渲染循环
+### 图块集成器与主渲染循环
 
-对于所有基于CPU的pbrt积分器，都是使用相机模型来定义视图相关的参数，来用于渲染图像，为了让不同处理器能够并行处理，把图像分割成一个个图块。所以，pbrt用图块积分器来实现这个操作。
+对于所有基于CPU的pbrt集成器，都是使用相机模型来定义视图相关的参数，来用于渲染图像，为了让不同处理器能够并行处理，把图像分割成一个个图块。所以，pbrt用图块集成器来实现这个操作。
 
 ```C++
+	class ImageTileIntegrator : public Integrator {
+	public:
+		void Integrator::Render() override {
+			// 为了把图像按图块渲染，声明一些通用的变量
+				// 先分配一点内存来暂存物体表面散射相关的属性，用来计算每条光辐射贡献
+				// 预分配内存是为了避免大量光线计算时，在多线程并发new时，影响系统对内存的管理功能，进而影响性能
+				// 若不预先分配内存，可能导致系统得内存分配得耗时占据了大部分的计算时间
+				// 为了解决这个问题，这里提供了ScratchBuffer类来管理一小块预分配好的内存作为缓冲。
+				// 这个缓冲区通过增量偏移来确认内存位置，缓冲区里的内存块不允许被单独释放，只能一起释放。释放也就只是把偏移量重置就可以了
+				// 由于这个类不是线程安全的，利用ThreadLocal模板类，为每个线程创建单独的一个ScratchBuffer
+				// 这个类的构造器根据lambda函数，根据ThreadLocal管理的对象的类型，来返回新的实例
+				// 之后ThreadLocal会负责维护和管理每个线程的这些对象。
+			ThreadLocal<ScratchBuffer> scratchBuffers([]() { return ScratchBuffer(); });
+				// 由于每个线程不能使用同一个采样点，也需要用ThreadLocal来管理每个线程的Sampler对象
+				// Sampler提供了Clone()函数来根据它的类型来创建新的实例
+				// Sampler一开始是通过构造器提供的，后续是通过samplerPrototype拷贝的
+			ThreadLocal<Sampler> samplers([this]() { return samplerPrototype.Clone(); });
+				// ProgressReporter用于提示用户渲染进展，第一个参数就是处理的任务的总数
+				// 这里，任务的总数就是每个像素点的采样个数，乘以总的像素点个数
+				// 这里有必要使用64位精度的数字来计算，因为对于高精度图像，每个像素点会有很多采样点，计算以后精度不够
+			Bounds2i pixelBounds = camera.GetFilm().PixelBounds();
+				// 像素点采样的数量
+			int spp = samplerPrototype.SamplesPerPixel();
+			ProgressReporter progress(int64_t(spp) * pixelBounds.Area(), "Rendering",
+				Options->quiet);
+				// 当前轮取的采样点个数起止用waveStart和waveEnd表示
+				// 下一轮要取得采样点总数用nextWaveSize表示
+			int waveStart = 0, waveEnd = 1, nextWaveSize = 1;
+			// 分轮次渲染图像
+			// 只要当前轮的采样点开始没到采样总数
+			while (waveStart < spp) {
+				// 并行地渲染当前轮数的图块
+					// 这个函数并行地循环整个图块，并行相关的功能函数参考B.6.A
+					// 这个函数会自动选取合适的图块大小，主要考虑2个方面:
+						// 1. 图块数量会远多于处理器个数，很可能某些图块处理起来快于其他图块
+							// 所以如果把图块1对一分给处理器，很可能某些处理器处理完后就会空闲，其他处理器还在忙碌
+						// 2. 图块太多也会影响处理效率，在并行线程请求任务时，会有微小的固定性能开销，图块越多，这个开销消耗的时间越多
+					// 因此，这个函数选取的图块大小综合考虑要处理的区域和系统的处理器数量
+				ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
+					// 根据图块边界tileBounds渲染图块
+						// 先请求线程对应的ScratchBuffer和Sampler
+					ScratchBuffer& scratchBuffer = scratchBuffers.Get();
+					Sampler& sampler = samplers.Get();
+					// 根据图块边界遍历每个像素pPixel
+					for (Point2i pPixel : tileBounds) {
+						// <<每个像素点根据采样点来渲染>>
+						for (int sampleIndex = waveStart; sampleIndex < waveEnd; ++sampleIndex) {
+							// 为像素点生成采样点，同时设置一些内部的状态
+							sampler.StartPixelSample(pPixel, sampleIndex);
+							// 负责确定特定采样点的值，然后会通过调用ScratchBuffer::Reset()来释放这部分临时内存
+							EvaluatePixelSample(pPixel, sampleIndex, sampler, scratchBuffer);
+							scratchBuffer.Reset();
+						}
+					}
+						// 把处理进度通知到ProgressReporter
+					progress.Update((waveEnd - waveStart) * tileBounds.Area());
+					});
+				// <<更新waveStart, waveEnd>>
+					// 把每轮的开始和结束，包括下一轮的数量都更新
+				waveStart = waveEnd;
+				waveEnd = std::min(spp, waveEnd + nextWaveSize);
+				nextWaveSize = std::min(2 * nextWaveSize, 64);
+				// <<可选：把当前图像写到磁盘里>>
+					// 若用户在命令行写了"-write-partial-images",那么处理中的图片会在下一轮处理完之前，写到硬盘里
+			}
+			// 派生类必须实现如何确定特定采样点的值
+			virtual void EvaluatePixelSample(Point2i pPixel, int sampleIndex,
+				Sampler sampler, ScratchBuffer & scratchBuffer) = 0;
 
-
+		}
+		ImageTileIntegrator(Camera camera, Sampler sampler,
+			Primitive aggregate, std::vector<Light> lights)
+			: Integrator(aggregate, lights),
+			camera(camera),
+			samplerPrototype(sampler) {}
+	protected:
+		// 定义观察到的试图和透镜相关的参数(位置，朝向，焦点，视场等)
+		Camera camera;
+		// 样本的原型，用于后续复制
+		Sampler samplerPrototype;
+	};
 ```
 
 采样器对最终生成的图像质量有明显的影响，它具有2个作用:
@@ -430,11 +509,11 @@ namespace pbrt {
 1. 选取哪些图像上的点，用于光线的追踪
 2. 提供随机的采样值，用于估算光的传输积分值
 
-比如，一些积分器需要根据光源选取随机的点，来计算面光源的光照效果。如何为这些光源生成分布更好的采样点会极大影响最终图像质量，详见第八章。
+比如，一些集成器需要根据光源选取随机的点，来计算面光源的光照效果。如何为这些光源生成分布更好的采样点会极大影响最终图像质量，详见第八章。
 
-对于所有的pbrt积分器来说，每个像素点最终的颜色是基于随机采样算法的。如果每个像素点的最终颜色是用多个采样点取平均值，那么图像的质量就更好。采样点如果太少，采样问题就是图像上会出现很多颗粒状噪点，当采样点越多，噪点就越少(详见2.1.4)。
+对于所有的pbrt集成器来说，每个像素点最终的颜色是基于随机采样算法的。如果每个像素点的最终颜色是用多个采样点取平均值，那么图像的质量就更好。采样点如果太少，采样问题就是图像上会出现很多颗粒状噪点，当采样点越多，噪点就越少(详见2.1.4)。
 
-图块积分器的render()函数，会分轮次处理每个像素的采样点，对于刚开始的两轮，每个像素点只取一个采样点，后面的两轮，每个像素点会取2个采样点，后面的每轮处理，采样点个数翻两倍。
+图块集成器的render()函数，会分轮次处理每个像素的采样点，对于刚开始的两轮，每个像素点只取一个采样点，后面的两轮，每个像素点会取2个采样点，后面的每轮处理，采样点个数翻两倍。
 
 虽然这样的处理对于最终图像结果没有影响，但是这样做就可以预览到图片生成的整个过程，而不是只能一个像素一个像素的出结果。
 
@@ -446,3 +525,154 @@ namespace pbrt {
 >
 > capped: 有上限的，避免处理任务加得太多导致其他线程闲置得问题
 
+### 光线集成器的实现
+
+刚刚的图块集成器用于把图片分为若干图块，光线集成器负责把从相机出发的光线进行收集和跟踪。所有相关的派生类集成器详见13，14章。
+
+```C++
+	// 光线集成器，负责跟踪相机出发的光的路径
+	class RayIntegrator : public ImageTileIntegrator {
+	public:
+		// 只是把参数传给图块集成器
+		RayIntegrator(Camera camera, Sampler sampler, Primitive aggregate,
+			std::vector<Light> lights)
+			: ImageTileIntegrator(camera, sampler, aggregate, lights) {}
+		// 对于给定的像素点，使用对应的Camera和Sampler来生成一束光，然后调用Li()函数(在派生类里)，
+		// 来确定这束光到达图片平面时有多少光辐射量，
+		// 后续章节我们会发现，这个函数返回的值得单位量，与入射光在光源点的光谱辐射有关
+		// 这里的Li()的函数名，对应的就是渲染公式里的Li
+		// Li()得到的值会传给Film,Film会记录图片上的光线贡献情况
+		void RayIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
+			Sampler sampler, ScratchBuffer& scratchBuffer) {
+			// <<为光线采样其光波波长>>
+				// 每一束光都带有离散的多个波长的辐射量(默认4个波长)
+				// 当为每个像素计算颜色值时，pbrt 在不同的像素采样中选择不同的波长，这样最终结果可以更好地反映所有波长的正确结果
+				// 为了选取这些波长，lu这个样本值会被Sampler提供，lu会在[0,1)之间
+			Float lu = sampler.Get1D();
+				// SampleWavelengths()会把lu映射到特定的一组波长(根据胶片传感器响应与波长关系的模型)
+				// 大部分Sampler实现保证了，若一个像素点有多个采样点，这些采样点在[0,1)之间分布均匀
+				// 反过来说，为了保证图片质量，也需要光的波长在[0,1)之间较均匀的分布(避免色彩不准)
+			SampledWavelengths lambda = camera.GetFilm().SampleWavelengths(lu);
+			// <<为当前采样初始化CameraSample>>
+				// CameraSample用来记录胶片上的位置，与相机生成的光线位置对应
+				// 相机生成光线的位置的选取，取决于采样点的位置和像素点对应的重建滤波器
+				// GetCameraSample就是用来完成以上操作的
+				// CameraSample同时记录了光线相关的时间，和镜头位置采样值，
+				// 用于渲染包含运动物体的场景和模拟非针孔光圈的相机模型
+			Filter filter = camera.GetFilm().GetFilter();
+			CameraSample cameraSample = GetCameraSample(sampler, pPixel, filter);
+			// << 在当前采样上生成相机光>>
+				// 相机接口提供了两个函数来生成光线
+				// GenerateRay()：根据给定的样本位置，生成光线
+				// GenerateRayDifferential(): 返回一个光线微分量，包含了相机在图像平面上 x 和 y 方向上相隔一个像素的采样点所生成的光线信息
+				// 光线微分量用于在某些材质下获得更好的结果，详见第10章
+				// 这个光线差分量可以用于计算像素间的纹理变化的程度，对于纹理的反锯齿来说至关重要
+				// 一些CameraSample值可能对于给定的相机来说，没有合适的光线，因此，返回值使optional的
+			pstd::optional<CameraRayDifferential> cameraRay =
+				camera.GenerateRayDifferential(cameraSample, lambda);
+			// <<若cameraRay有效，则跟踪光线>>
+				// 在做完一些准备工作后，会把这个光传到光线集成器的派生类的Li()函数
+				// 为了能返回光线L的辐射量，这个派生类还要负责初始化VisibleSurface类的实例
+				// 这个实例用于为每个像素点，收集关于交点所在表面的几何信息，用于Film里面来储存
+			SampledSpectrum L(0.);
+			VisibleSurface visibleSurface;
+			if (cameraRay) {
+				// <<根据图像的采样频率，缩放相机光线的微分量>>
+					// 在传到Li()函数前，ScaleDifferentials()函数会把光的微分量做缩放
+					// 这种缩放是为了某个像素多个采样点的时候，用于表示胶片所在面的样本之间的实际间隔
+				Float rayDiffScale =
+					std::max<Float>(.125f, 1 / std::sqrt((Float)sampler.SamplesPerPixel()));
+				cameraRay->ray.ScaleDifferentials(rayDiffScale);
+				// <<计算相机光的辐射量>>
+					// 对于没有储存每个像素点几何信息的Film实现，可以省下填充VisibleSurface对象的工作
+					// 因此，只有在必要的时候才把这个值传入Li()函数，集成器的实现只有在VisibleSurface指针不为空的时候做初始化
+					// CameraRayDifferential也携带了用来缩放光辐射量的权重值，对于简单的相机模型，每一束光的权重是相等的
+					// 但是为了模拟相机不同的镜片系统的成像过程，可能某些光对光辐射量的贡献要大于其他的光
+					// 比如，光晕效果，就是胶片平面边缘的光辐射量小于中心区域的光的辐射量
+				bool initializeVisibleSurface = camera.GetFilm().UsesVisibleSurface();
+				L = cameraRay->weight *
+					Li(cameraRay->ray, lambda, sampler, scratchBuffer,
+						initializeVisibleSurface ? &visibleSurface : nullptr);
+				// <<对于非预期计算错误的值，进行warn>>
+			}
+			// <<为图片添加相机光对其的光贡献>>
+				// 在到达光源的辐射量已知后，调用addSample()来更新对应像素点，为采样加上辐射量的权重
+				// 关于如何在胶片中进行采样，详见5.4和8.8
+			camera.GetFilm().AddSample(pPixel, L, lambda, &visibleSurface,
+				cameraSample.filterWeight);
+		}
+
+		// 这个函数在光线集成器的子类必须实现，此函数返回指定光线原点的入射光辐射量，在特定波长进行采样
+		virtual SampledSpectrum Li(
+			RayDifferential ray, SampledWavelengths& lambda, Sampler sampler,
+			ScratchBuffer& scratchBuffer, VisibleSurface* visibleSurface) const = 0;
+	};
+```
+
+补充几个问题:
+
+> *为什么需要$l_u$来随机分布波长?*
+>
+> 在渲染过程中，光线是由不同波长的光组成的，而这些波长对不同的颜色有贡献。为了在有限的计算资源下近似地计算所有波长的光线贡献，pbrt 使用了一种随机采样的方法。通过对不同像素的光线采样时选择不同的波长，pbrt 能够捕捉到更多的光谱细节，避免单一波长的光线主导计算结果。$l_u$是一个随机变量，用来确保在多个像素采样之间波长的选择是均匀和随机的，从而使得最终的渲染结果更接近真实的光谱表现。
+>
+> *胶片传感器响应与波长关系的模型是什么?*
+>
+> 胶片传感器对不同波长的光具有不同的敏感度。这种响应曲线通常模拟真实世界中感光元件（如相机传感器或人眼）对不同波长的光的敏感度。每个波长的光照强度会对颜色的呈现产生不同的影响，胶片传感器响应模型能够让渲染引擎更准确地反映光源和物体表面反射的真实颜色。pbrt 的 Film::SampleWavelengths() 方法会基于这个模型来选择那些对传感器响应显著的波长，确保对不同波长的光有合适的权重处理
+>
+> *为什么说要提高图像质量，要确保采样的波长也在有效波长范围内均匀分布？*
+>
+> 如果采样的波长分布不均匀，那么一些波长可能会被过度采样，而其他波长可能被忽略。这会导致渲染结果偏向某些特定颜色，无法真实反映出完整的光谱。均匀分布的波长采样可以确保所有波长的光都有机会对最终的颜色贡献，从而使得颜色计算更接近真实世界的光学效果。这种均匀分布可以减少颜色失真，提高渲染的精确度和图像的整体质量。
+>
+> *sampler.Get1D()是一个随机值吗?*
+>
+> 不一定是完全随机的，不同的采样器（如随机采样器、均匀采样器、分层采样器等）可能会使用不同的采样策略。某些采样器可能通过准随机序列或确定性分布来生成值，以保证在样本空间中的均匀分布或更好的覆盖率，来完成不同目的的采样工作
+>
+> *什么是ray differential?*
+>
+> 表示光线在图像平面上的微小变化，通常用于处理图像的细节和纹理映射,使图像的光线采样精度更高，图像质量更好
+
+### 随机行走集成器
+
+> 光线的每一次反射或折射都视为一次“随机行走”的步骤，直到光线离开场景、被完全吸收或不再对图像产生重要贡献为止
+
+随机行走集成器(RandomWalkIntegrator)继承自光线集成器，用来计算从光源打过来的光线的辐射量。
+
+回忆一下，在1.2.7提到的忽略光传播介质的场景，光在空间里不会改变。这里我们也会忽略光在介质中的情况。假设入射光携带的光辐射与散射后的光的辐射量相等。出射光的辐射量根据渲染公式给出。
+
+由于渲染公式不好计算，需要使用多种方法实现，在pbrt中，使用基于蒙特卡洛积分的方法，这种方式基于每个点的积分量来估计整个积分式的值。第二章会介绍蒙特卡洛积分，还有关于本书会使用到的关于蒙特卡洛积分的技术的额外内容。
+
+虽然随机行走算法的实现也就20行左右，但是可以模拟复杂的光影效果(好的效果渲染时间很长)。在本章剩余的部分，我们会暂时跳过数学理论的部分，用更直观的方式来介绍这种方法。在后续章节中，会把跳过的部分进行补充。
+
+根据渲染公式:
+$$
+L_o(p, \omega_o) = L_e(p, \omega_o) + \int_{S^2}f(p, \omega_o,\omega_i)L_i(p,\omega_i)|\cos \theta_i|d\omega_i
+$$
+
+第一部分可以直接获得，第二部分是个积分式，可用蒙特卡洛积分来估计，设有p点任意方向$\omega '$, 根据$\omega '$就可求得此点的出射辐射量，用这个出射辐射量除以$d\omega_i$微元，即球面积的微元$\frac{1}{4\pi r^2}$(r=1),可估计出积分的值
+$$
+\int_{S^2}f(p, \omega_o,\omega_i)L_i(p,\omega_i)|\cos \theta_i|d\omega_i \approx \frac{f(p, \omega_o,\omega ')L_i(p,\omega ')|\cos \theta '|}{\frac{1}{4 \pi}}
+$$
+
+就是说，估计一个积分的值，可以通过取积分上的其中一个值，用这个值缩放到积分域上来估计出来。取一个这样的值不够准确，就可以多取几个，然后取平均值，这样的方式即是说，取的点越多，积分的估计值越接近真实值。因此，每个像素点需要采样多次。
+
+BSDF部分和余弦部分好算。只剩$L_i$(入射光辐射)的部分，然而，我们之前刚开始调用LiRandomWalk()的时候，我们用这个函数来找光源处的入射光的光辐射，所以说，通过递归调用，就能得到$L_i$
+
+> *为什么可以通过生成一个2f的随机数，生成球面均匀分布的单位向量？*
+>
+> ```C++
+> Point2f u = sampler.Get2D();
+> Vector3f wp = SampleUniformSphere(u);
+> ```
+>
+> 直接用3f生成的xyz不是在球面均匀分布的，会导致在球面两极少，赤道附近密集的情况
+>
+
+这种方式有很多缺点，如果发光的光源表面很小，大部分从相机发出的光线都找不到这个光源，为了得到更准确地图像，就需要更多的发出光线。对于点光源，图像就会变得黑，因为点光源与光线相交的概率为0。当散射的光集中于一小块区域的时候也有这个问题。是因为这种类似完美镜面的表面，光线只沿一个方向反射，但是随机采样法没法精确找到这个方向，造成无法准确模拟镜面反射的情况。
+
+当蒙特卡洛积分应用得越深，这种问题越明显。在下面的章节中，我们会介绍如何改善这个问题。在第13和15章中，会详细说明这个问题。那些改进都是基于随机行走集成器的，但是会更健壮和高效。
+
+## 如何阅读这本书
+
+作者是严格按照从前到后的方式组织本书的。后面的章节默认读者是读过前面的章节，有些章节会比较深入和进阶，第一次读会比较吃力，在标题标注了*号。
+
+源码在官网上，C++写的

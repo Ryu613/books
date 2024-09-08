@@ -643,6 +643,72 @@ namespace pbrt {
 
 虽然随机行走算法的实现也就20行左右，但是可以模拟复杂的光影效果(好的效果渲染时间很长)。在本章剩余的部分，我们会暂时跳过数学理论的部分，用更直观的方式来介绍这种方法。在后续章节中，会把跳过的部分进行补充。
 
+```C++
+	// 随机行走集成器
+	class RandomWalkIntegrator : public RayIntegrator {
+	public:
+		// 这个函数会递归调用LiRandomWalk(),大部分此函数的参数都只是"路过"这个函数, VisibleSurface在这里会被忽略
+		// 多了一个参数用于记录递归的深度
+		SampledSpectrum Li(RayDifferential ray, SampledWavelengths& lambda,
+			Sampler sampler, ScratchBuffer& scratchBuffer,
+			VisibleSurface* visibleSurface) const {
+			return LiRandomWalk(ray, lambda, sampler, scratchBuffer, 0);
+		}
+	private:
+		// 由Li递归调用
+		SampledSpectrum LiRandomWalk(RayDifferential ray,
+			SampledWavelengths& lambda, Sampler sampler,
+			ScratchBuffer& scratchBuffer, int depth) const {
+			// <<若光线有相交则返回对应对象，否则>>
+				// 第一步，先找到最近的交点的物体，若没有相交的，光线就会离开场景
+				// 若有相交，返回ShapeIntersection对象，这个对象包含了交点的几何属性信息
+			pstd::optional<ShapeIntersection> si = Intersect(ray);
+				// 若没有交点，这个光线还是有光辐射，是来自于阳光等平行光的光辐射，用来模拟环境光
+			if (!si) {
+				// << 返回平行光源发射出来的光 >>
+				SampledSpectrum Le(0.f);
+					// 把这些平行光做累加
+				for (Light light : infiniteLights)
+					Le += light.Le(ray, lambda);
+				return Le;
+			}
+			SurfaceInteraction& isect = si->intr;
+			// << 找到表面交点发出的光 >>
+				// 若有交点被找到，交点处需要根据光传播的公式做计算
+				// 渲染公式里第一个量Le(p,wo)，是代表照出来的光的辐射量，通过调用SurfaceInteraction::Le()获取
+			Vector3f wo = -ray.d;
+				// 这里用来获取光线方向上发出的光的辐射量，若物体不是发光体，这部分就返回光谱分布为0的量
+				// 渲染公式里的第二项是一个积分式，要求p点为球心的积分，这里可以用蒙特卡洛积分
+				// 在p点任取方向w',那么可以估计出这个积分约等于这个点的光辐射量乘以dwi微元的总和
+			SampledSpectrum Le = isect.Le(wo, lambda);
+			// <<若最大递归深度达到，返回Le>>
+			if (depth == maxDepth)
+				return Le;
+			// <<计算交点处的BSDF>>
+			BSDF bsdf = isect.GetBSDF(ray, lambda, camera, scratchBuffer, sampler);
+			// <<为离开表面的w'方向采样>>
+			Point2f u = sampler.Get2D();
+				// SampleUniformSphere返回u点对应的单位球面的均匀分布随机单位向量
+			Vector3f wp = SampleUniformSphere(u);
+			// <<根据采样的方向和表面，计算BSDF>>
+				// BSDF提供f()来计算特定方向的值，通过absDot计算cosθ的绝对值，由于向量是单位化的，所以点乘以后就是cosθ
+				// BSDF和cosθ都可能为0，这种情况就直接返回，因为对于结果的光辐射没有影响
+			SampledSpectrum fcos = bsdf.f(wo, wp) * AbsDot(wp, isect.shading.n);
+			if (!fcos)
+				return Le;
+			// <<递归地跟踪光线，来估计表面的入射光辐射量>>
+				// SpawnRay()用于计算离开表面的那个新的光线(朝向w'的)
+				// 还要保证光线的偏转足够大，不会再次与这个表面相交
+				// 得到这个新光线后，再递归调用LiRandomWalk()来估计入射光辐射量，得到Li的最终值
+			ray = isect.SpawnRay(wp);
+			return Le + fcos * LiRandomWalk(ray, lambda, sampler, scratchBuffer,
+				depth + 1) / (1 / (4 * Pi));
+		}
+
+		int maxDepth;
+	};
+```
+
 根据渲染公式:
 $$
 L_o(p, \omega_o) = L_e(p, \omega_o) + \int_{S^2}f(p, \omega_o,\omega_i)L_i(p,\omega_i)|\cos \theta_i|d\omega_i

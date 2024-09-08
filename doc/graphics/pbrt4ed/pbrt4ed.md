@@ -1,8 +1,6 @@
 # Physically Based Rendering From Theory To Implementation 4ed
 
-> 翻译规则:
->
-> integrator: 文中主要是指把类似元素的合并处理过程，不完全是数学概念的积分，本文章统一叫集成器
+> 读者需要具有 高等数学，线性代数，概率论与统计学，图形学，C++的基础
 
 ## [第一章 前言和介绍](chapter1/chapter1.md)
 

@@ -2,13 +2,13 @@
 
 > 读者需要具有 高等数学，线性代数，概率论与统计学，图形学，C++的基础
 
-## [第一章 前言和介绍](chapter1/chapter1.md)
+## [第一章 绪论](chapter1/chapter1.md)
 
-## [第二章 蒙特卡罗积分](chapter2/chapter2.md)
+## [第二章 蒙特卡洛积分](chapter2/chapter2.md)
 
 ## [第三章 几何和矩阵转换](chapter3/chapter3.md)
 
-## 第四章 辐射度量学，光谱，色彩
+## [第四章 辐射度量学，光谱，色彩](chapter4/chapter4.md)
 
 ## 第五章 相机和胶片
 

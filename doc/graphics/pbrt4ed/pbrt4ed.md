@@ -1,6 +1,7 @@
 # Physically Based Rendering From Theory To Implementation 4ed
 
 > 读者需要具有 高等数学，线性代数，概率论与统计学，图形学，C++的基础
+> 每一章重点和精华部分会逐步更新到此处
 
 ## [第一章 绪论](chapter1/chapter1.md)
 
@@ -10,7 +11,7 @@
 
 ## [第四章 辐射度量学，光谱，色彩](chapter4/chapter4.md)
 
-## 第五章 相机和胶片
+## [第五章 相机和胶片](chapter5/chater5.md)
 
 ## 第六章 几何形状
 

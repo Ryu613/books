@@ -8,7 +8,7 @@
 
 基于物理学的渲染，讲的很全面且深入，这本足够打下pbr坚实基础，代码pbrt-v4主要是离线pbr渲染,可选CPU或GPU渲染。
 
-在[pbrt-v4](pbrt4ed/pbrt-v4)文件夹中,我梳理了项目源码核心流程和类层次抽象
+在[pbrt-v4](pbrt4ed/pbrt-v4)文件夹中,我梳理了项目源码核心流程和主要类的层次和函数
 
 ## [Real-Time Rendering, Fourth Edition](rtr4/rtr4.md)
 

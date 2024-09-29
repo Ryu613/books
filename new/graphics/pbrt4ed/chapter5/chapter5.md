@@ -172,25 +172,264 @@ CameraTransform::CameraTransform(const AnimatedTransform &worldFromCamera) {
 
 Camera接口的通用函数放到CameraBase中，其他相机类皆继承此类。关于camera的实现的相机类都放在cameras.h下面
 
+CameraBase类如下:
+
+```c++
+/*
+    camera接口的通用功能实现在此，所有camera实现须继承此类
+*/
+class CameraBase {
+  public:
+    // CameraBase Public Methods
+    PBRT_CPU_GPU
+    Film GetFilm() const { return film; }
+    PBRT_CPU_GPU
+    const CameraTransform &GetCameraTransform() const { return cameraTransform; }
+
+    PBRT_CPU_GPU
+    Float SampleTime(Float u) const { return Lerp(u, shutterOpen, shutterClose); }
+
+    void InitMetadata(ImageMetadata *metadata) const;
+    std::string ToString() const;
+
+    PBRT_CPU_GPU
+    void Approximate_dp_dxy(Point3f p, Normal3f n, Float time, int samplesPerPixel,
+                            Vector3f *dpdx, Vector3f *dpdy) const {
+        // Compute tangent plane equation for ray differential intersections
+        Point3f pCamera = CameraFromRender(p, time);
+        Transform DownZFromCamera =
+            RotateFromTo(Normalize(Vector3f(pCamera)), Vector3f(0, 0, 1));
+        Point3f pDownZ = DownZFromCamera(pCamera);
+        Normal3f nDownZ = DownZFromCamera(CameraFromRender(n, time));
+        Float d = nDownZ.z * pDownZ.z;
+
+        // Find intersection points for approximated camera differential rays
+        Ray xRay(Point3f(0, 0, 0) + minPosDifferentialX,
+                 Vector3f(0, 0, 1) + minDirDifferentialX);
+        Float tx = -(Dot(nDownZ, Vector3f(xRay.o)) - d) / Dot(nDownZ, xRay.d);
+        Ray yRay(Point3f(0, 0, 0) + minPosDifferentialY,
+                 Vector3f(0, 0, 1) + minDirDifferentialY);
+        Float ty = -(Dot(nDownZ, Vector3f(yRay.o)) - d) / Dot(nDownZ, yRay.d);
+        Point3f px = xRay(tx), py = yRay(ty);
+
+        // Estimate $\dpdx$ and $\dpdy$ in tangent plane at intersection point
+        Float sppScale =
+            GetOptions().disablePixelJitter
+                ? 1
+                : std::max<Float>(.125, 1 / std::sqrt((Float)samplesPerPixel));
+        *dpdx =
+            sppScale * RenderFromCamera(DownZFromCamera.ApplyInverse(px - pDownZ), time);
+        *dpdy =
+            sppScale * RenderFromCamera(DownZFromCamera.ApplyInverse(py - pDownZ), time);
+    }
+
+  protected:
+    // CameraBase Protected Members
+    CameraTransform cameraTransform;
+    Float shutterOpen, shutterClose;
+    Film film;
+    Medium medium;
+    Vector3f minPosDifferentialX, minPosDifferentialY;
+    Vector3f minDirDifferentialX, minDirDifferentialY;
+
+    // CameraBase Protected Methods
+    CameraBase() = default;
+
+    CameraBase(CameraBaseParameters p);
+
+    /*
+        通过多次调用camera的GenerateRay()函数来计算光线的微分量
+
+        camera的实现类必须实现此函数，但是那些方法之后还是会调用此函数
+        (注意，函数的签名不同于实现类中的那个)
+
+        相机的各种实现类会传入this指针(camera入参)，这会允许此函数调用对应camera的
+        GenerateRay()函数。这种额外复杂性的引入是由于我们没在camera接口使用虚函数，
+        这意味着CameraBase类需要有camera传入才能调用GenerateRay()方法
+    */
+    PBRT_CPU_GPU
+    static pstd::optional<CameraRayDifferential> GenerateRayDifferential(
+        Camera camera, CameraSample sample, SampledWavelengths &lambda);
+};
+```
+
+CameraBase的构造器参数如下:
+
+```c++
+/*
+    CameraTransForm: 最重要的类，把相机坐标变换成场景所用的坐标
+    
+    shutterOpen, shutterClose: 快门的开关时间
+
+    Film: 存储最终图像，且模拟了胶片的传感器
+
+    Medium: 相机要考虑的介质
+*/
+struct CameraBaseParameters {
+    CameraTransform cameraTransform;
+    Float shutterOpen = 0, shutterClose = 1;
+    Film film;
+    Medium medium;
+    CameraBaseParameters() = default;
+    CameraBaseParameters(const CameraTransform &cameraTransform, Film film, Medium medium,
+                         const ParameterDictionary &parameters, const FileLoc *loc);
+};
+```
+
 ## 5.2 投影相机的模型
+
+三维空间下的观察问题在三维图形学下是最基本的问题之一，即，如何把3D场景展示在二维图像上。最经典的解决方法是用$4\times 4$矩阵来实现。因此，我们会介绍一个投影矩阵的相机类，叫ProjectiveCamera，然后基于它，定义2个相机模型。第一个实现是正交投影，另一个实现是透视投影，这两种是最经典和广泛运用的投影类型。
+
+正交和透视投影都需要定义2个与观察方向垂直的平面，近平面和远平面，当渲染在光栅化的时候，不在这两个平面内的物体会被剔除，最终图像中就没有这些物体。(剔除近平面前面的物体是非常重要的，为了防止物体深度为0时计算投影出现问题，把相机背后的物体错误地映射到了前面)
+
+> 当物体深度接近或等于0时，计算时导致结果为无穷大或未定义，导致奇点问题(不可控现象，比如黑块，闪烁，消失)。深度值为负时，若计算没有加排除负值的判断，会导致相机后面的物体会跑到前面来
+
+对于光追器来说，投影矩阵只是单纯用来检测离开相机的光，没有考虑相机后面的情况，所以会出现此问题
+
+还有更多的坐标系统，这些坐标系统对于定义各种投影相机类很有用：
+
+- 屏幕空间： 在胶片平面上定义，相机在相机空间中把物体投影到了胶片平面上，在屏幕窗口中，生成图像的一部分会被看到。近平面上的点对应的z深度是0，远平面上的点对应z深度就是1。注意，虽然其被称为"屏幕"空间，但是还是一个3维的坐标系统，因为z值还是有意义的
+- 标准化设备坐标(NDC)空间: 被渲染的图像真正的坐标系统，在x和y，范围从坐上到右下，(0,0)到(1,1)，深度值与屏幕空间一样，可通过线性变换把屏幕空间转换为NDC空间
+- 光栅空间：与NDC空间几乎相同，除了x和y是从(0,0)到图像分辨率下的x,y值
+
+这三种空间和近远平面的关系如下:
+
+![图5.2](img/fg5_2.png)
+图5.2 一些camera相关的类的坐标空间一般用于简化camera的实现。camera类持有这些空间之间的转换方法。在渲染空间下的场景中的物体会被相机观察到，相机坐落于相机空间的原点，指向+z方向。在近平面和远平面之间的物体，会被投影到胶片平面，胶片平面就是相机空间中的近平面。胶片平面在光栅平面就是z=0的地方，x，y的值就是图片分辨率的x,y值。NDC空间归一化了光栅空间，所以x,y值在(0,0)到(1,1)
+
+除了CameraBase类需要的参数外，ProjectiveCamera也需拿到投影变换矩阵参数，屏幕空间的范围就是图像的范围，还有焦距参数和透镜光圈大小的参数。如果光圈不是一个无穷小的孔，那么图像中的一部分可能会模糊(在真实的透镜系统中，聚焦范围外的物体会模糊)。这种效果的模拟会在后面的章节详述
+
+```c++
+/*
+    投影相机： 从3d场景转换到2d图像的抽象，继承有正交和透视投影相机
+*/
+class ProjectiveCamera : public CameraBase {
+  public:
+    // ProjectiveCamera Public Methods
+    ProjectiveCamera() = default;
+    void InitMetadata(ImageMetadata *metadata) const;
+
+    std::string BaseToString() const;
+
+    /*
+        除了CameraBase类需要的参数外，ProjectiveCamera也需拿到投影变换矩阵参数，
+        屏幕空间的范围就是图像的范围，还有焦距参数和透镜光圈大小的参数。
+        如果光圈不是一个无穷小的孔，那么图像中的一部分可能会模糊(在真实的透镜系统中，
+        聚焦范围外的物体会模糊)
+
+        ProjectiveCamera的继承类会把投影变换传到基类的构造器中，提供了相机到屏幕
+        空间的投影转换。因此，构造器能更方便的从光栅空间转换到相机空间
+    */
+    ProjectiveCamera(CameraBaseParameters baseParameters,
+                     const Transform &screenFromCamera, Bounds2f screenWindow,
+                     Float lensRadius, Float focalDistance)
+        : CameraBase(baseParameters),
+          screenFromCamera(screenFromCamera),
+          lensRadius(lensRadius),
+          focalDistance(focalDistance) {
+        // Compute projective camera transformations
+        // Compute projective camera screen transformations
+        /*
+            从屏幕空间转换到光栅空间，注意y轴是反过来的
+        */
+        Transform NDCFromScreen =
+            Scale(1 / (screenWindow.pMax.x - screenWindow.pMin.x),
+                  1 / (screenWindow.pMax.y - screenWindow.pMin.y), 1) *
+            Translate(Vector3f(-screenWindow.pMin.x, -screenWindow.pMax.y, 0));
+        Transform rasterFromNDC =
+            Scale(film.FullResolution().x, -film.FullResolution().y, 1);
+        rasterFromScreen = rasterFromNDC * NDCFromScreen;
+        screenFromRaster = Inverse(rasterFromScreen);
+
+        cameraFromRaster = Inverse(screenFromCamera) * screenFromRaster;
+    }
+
+  protected:
+    // ProjectiveCamera Protected Members
+    Transform screenFromCamera, cameraFromRaster;
+    Transform rasterFromScreen, screenFromRaster;
+    Float lensRadius, focalDistance;
+};
+```
 
 ### 5.2.1 正交投影相机
 
+正交投影相机把场景的矩形区域投影到区域对应的盒子区域的正面上。物体在这种投影法上，没有近大远小的变化，平行的线还是平行的，并且这种方式保持了物体间相对的距离，如图5.3:
+
+![图5.3](img/fg5_3.png)
+图5.3 正交观察矩形体是一个在相机空间里与坐标轴对齐的盒子，在其中的物体会被投影到z=近平面上
+
+正交投影的图片看上去会显得缺乏深度感。但是平行的线还是能保持平行
+
+正交投影相机OrthographicCamera的构造器用Orthographic()函数生成正交变换矩阵
+
 ### 5.2.2 透视投影相机
+
+与正交投影相似的是透视投影相机也会把长方体空间投影到二维胶片的面上，但是，会有近大远小效果。物体投影后会产生形状变化，这种方式与人眼和相机镜头的原理相似。
 
 ### 5.2.3 薄透镜模型和景深
 
+理想化的针孔相机只允许光线通过单个点，然后到达胶片上，在现实是不可实现的。然而，让相机拥有极小的光圈是可行的，小的光圈允许相对更少的光照射到胶片传感器上，在这种场景下，需要更长时间的光照来捕获足够的光子来精确的拍到图像，代价是，当物体在快门打开的期间移动，会导致物体模糊。
+
+真实的相机有镜头系统，会把光聚焦在一个有限尺寸下的光圈中，光线穿过此光圈照到胶片上。相机的设计师们(和摄影师们利用可调节大小的光圈)面临一个抉择：光圈越大，照射到胶片上的光越多，需要曝光的时间就越短。然而，镜头只能聚焦在单个平面上(焦距面)，离这个平面距离越远的物体，就越模糊，越大的光圈，这个效应越明显。
+
+RealisticCamera类实现了一个对真实镜头系统的很精确的模拟。对于我们之前介绍的简单的相机模型来说，我们能应用一个经典的的光学近似方法，即薄透镜近似法，这种近似法利用传统计算机图形学投影模型，来对有限光圈的效应做建模。薄透镜近似法用一个球形轮廓的镜片的光学系统来建模，此透镜的厚度相对于镜片的曲率半径要小
+
+在薄透镜近似法下，与光轴相平行的入射光会穿过透镜，并聚焦于透镜后的一点，这个点叫焦点。焦点到透镜的距离f叫焦距。如果胶片平面被安放在焦点处，那么无限远的物体会被聚焦，因为它们会在胶片上变成一个点
+
+接下来介绍了薄透镜原理和公式，初中物理知识
+
 ## 5.3 球形相机
+
+此相机会在相机的一个点上收集所有方向的光，然后把点映射到图像对应的方向上，对应类是SpericalCamera
 
 ## 5.4 胶片和成像
 
+之前讲了相机的投影和镜头系统，现在有必要对胶片如何衡量光进行建模，来最终渲染出图像。本章会从辐射度量学如何衡量在胶片上的光说起，然后继续说光谱能量如何被转换为三原色(RGB),这会引出PixelSensor类，这个类就是用来做这个事的，一般来讲也是利用相机来处理，下一步是考虑胶片上的图像采样如何被累加到最终图像的每个像素点上，我们会介绍Film接口和其2个实现类
+
 ### 5.4.1 相机计算公式
+
+公式给出了真实图像的形成过程，同时，更小心的定义胶片或者相机传感器涉及到的辐射度量学中的量是有意义的。穿过透镜的光线携带了场景中的光辐射量。对于胶片上的一点，也因此带有入射光包含的各种方向上的辐射量。离开镜头的辐射量的分布受胶片上那个点的离焦模糊量影响，图5.17展示了2张图片，分别展示了胶片上两个点看到的从镜头射过来的辐射量图像
+
+![图5.17](img/fg5_17.png)
+
+胶片上的两点看到的图像，上图表示在聚焦清晰的点来看，入射辐射在该区域几乎恒定；下图表示在失焦区域的点来看，只有很小的区域可视，且这个区域的辐射强度变化很快
+
+给出入射辐射量的函数，我们能定义胶片上某点的入射光的辐照度。可用辐射度来得到辐照度，我们可以利用立体角微元$d\omega$的计算公式$d\omega=\frac{dA\cos \theta}{r^2}$的计算公式, 把在立体角上的积分转换为在面积上的积分(在这种情况下，这个平面的一个区域$A_e$与后透镜元件是相切的)。这样就可以得到在胶片上的点p的辐照度公式:
+
+$$
+E(p)=\int_{A_e}L_i(p,p')\frac{|\cos \theta \cos \theta'|}{||p'-p||^2}dA_e
+$$
+
+> 本式通过辐射度在面积微元$A_e$上积分得到辐照度
+>
+> 其中$A_e$是在切线的平面的面积
+>
+> $L_i(p,p')$代表从点p'发出的光，落到p处的辐射度
+>
+> $\theta$如下图，是p点和法线的夹角
+>
+> $\theta'$是p'和法线的夹角
+>
+> 之所以取$|\cos \theta \cos \theta'|$,是对$L_i(p,p')$做了两次朗伯余弦，代表了从透镜到p',从p'到p的夹角导致的光辐射衰减
+>
+> $||p'-p||^2$代表从点p'到p的距离，除以此项是用来表示距离与光的强度呈平方反比衰减
+
+> 后透镜元件: 指的是相机镜头中的最后一个透镜元件，通常位于镜头的后部，紧邻相机传感器或胶卷。它的主要作用是将光线聚焦到传感器上，从而形成清晰的图像
+
+图5.18展示了这种场景下的几何关系:
+
+![图5.18](img/fg5_18.png)
+
+图5.18：辐照度测量方程的几何设置。辐射度可以在通过后透镜元件切线平面上的点 p' 到胶卷平面上的点 p 时进行测量。z 是从胶卷平面到后透镜切线平面的轴向距离，$\theta$ 是从 p' 到 p 的向量与光轴之间的角度。
 
 ### 5.4.2 传感器响应的建模
 
 ### 5.4.3 图像采样的过滤
 
 ### 5.4.4 胶片接口
+
+胶片接口定义在film.h文件中
 
 ### 5.4.5 胶片的通用功能
 

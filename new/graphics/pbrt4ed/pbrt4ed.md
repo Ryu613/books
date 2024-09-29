@@ -8,7 +8,7 @@
 >
 > 原始代码: [pbrt-v4](https://github.com/mmp/pbrt-v4)
 >
-> pbrt代码本人注解版: [pbrt-v4-digest-cn](https://github.com/Ryu613/pbrt-v4-digest-cn)
+> pbrt代码本人注解版(也是fork自原始代码): [pbrt-v4-digest-cn](https://github.com/Ryu613/pbrt-v4-digest-cn)
 >
 > 本人学习后重写版:[《物理式渲染技术》](物理式渲染技术.md)
 > 目前还在持续更新中

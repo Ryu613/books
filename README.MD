@@ -4,9 +4,9 @@
 
 ## [新目录](new/readme.md)
 
-### [计算机图形学](graphics/readme.md)
+### [计算机图形学](new/graphics/readme.md)
 
-### [C++](C++/readme.md)
+### [C++](new/C++/readme.md)
 
 ## [文章](article/readme.md)
 

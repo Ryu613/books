@@ -27,7 +27,7 @@ pbrt是基于光线追踪算法的。此算法沿着无限小的光线出发，�
 
 ### 什么是pbrt？
 
-pbrt即基于物理学的渲染系统，这个渲染系统是基于光线追踪算法的。这个系统能被用来渲染复杂场景下的仿真图片
+pbrt即Physically Based Rendering Toolkit(基于物理的渲染工具包)，这个渲染系统是基于光线追踪算法的。能被用来渲染复杂场景下的仿真图片
 
 ### 本书特点
 
@@ -201,7 +201,7 @@ $$
 >
 > $\int_{S^2}$: 表示从p点为球心所在的球面$S^2$上，要汇总所有入射光的光辐射
 >
-> $f(p, \omega_o,\omega_i)$: 这个就是BRDF函数，指从入射光方向$\omega_i$到出射方向$\omega_o$的光的反射辐射量是多少
+> $f(p, \omega_o,\omega_i)$: 这个就是BSDF函数，指从入射光方向$\omega_i$到出射方向$\omega_o$的光的反射辐射量是多少
 >
 > $L_i(p,\omega_i)$: 光源入射到p点的辐射度
 >
@@ -523,7 +523,7 @@ namespace pbrt {
 >
 > doubling:使线程要处理的任务加倍，减少请求新图块的频率
 >
-> capped: 有上限的，避免处理任务加得太多导致其他线程闲置得问题
+> capped: 有上限的，避免处理任务加得太多导致其他线程闲置的问题
 
 ### 光线积分器的实现
 
@@ -566,8 +566,8 @@ namespace pbrt {
 				// GenerateRay()：根据给定的样本位置，生成光线
 				// GenerateRayDifferential(): 返回一个光线微分量，包含了相机在图像平面上 x 和 y 方向上相隔一个像素的采样点所生成的光线信息
 				// 光线微分量用于在某些材质下获得更好的结果，详见第10章
-				// 这个光线差分量可以用于计算像素间的纹理变化的程度，对于纹理的反锯齿来说至关重要
-				// 一些CameraSample值可能对于给定的相机来说，没有合适的光线，因此，返回值使optional的
+				// 这个光线微分量可以用于计算像素间的纹理变化的程度，对于纹理的反锯齿来说至关重要
+				// 一些CameraSample值可能对于给定的相机来说，没有合适的光线，因此，返回值是optional的
 			pstd::optional<CameraRayDifferential> cameraRay =
 				camera.GenerateRayDifferential(cameraSample, lambda);
 			// <<若cameraRay有效，则跟踪光线>>

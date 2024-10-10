@@ -518,6 +518,14 @@ b是维恩位移常数$2.8977721\times 10^{-3}m\,K$
 
 ### 4.5.4 采样后的光谱分布
 
+#### SampledSpectrum
+
+#### SampledWaveLengths
+
+这个类存储了某个有样本的SampledSpectrum对象的波长。这样做不仅能跟踪某个独立的SampledSpectrum的SampledWavelengths，而且也不会在具有多个波段样本的SampledSpectrums的时候有任何组合操作
+
+为了在蒙特卡洛积分下使用，波长被存于SampledWavelengths, 必须根据某种概率分布来采样，因此，这个类储存了波长本身，同时也存了每个波长的概率密度
+
 ## 4.6 色彩
 
 ### 4.6.1 XYZ色彩

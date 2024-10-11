@@ -23,6 +23,24 @@ pbrt使用了2层抽象来分离几何特征和几何形状。
 
 Shape的实现类必须提供2个函数的实现，这两个函数用于测试光线与其相交。第一个是Intersect(), 会返回关于单个光线与形状第一次相交的信息，给定的光线的t应该在(0, tMax)区间。
 
+<<Shape接口>>
+
+```c++
+pstd::optional<ShapeIntersection> Intersect(const Ray &ray,
+                                            Float tMax = Infinity) const;
+```
+
+当交点被找到时，会返回ShapeIntersection，其中的SurfaceInteraction是交点对应的表面交互过程，tHit是光到交点的t，用于表示距离
+
+<<ShapeIntersection的定义>>
+
+```c++
+struct ShapeIntersection {
+    SurfaceInteraction intr;
+    Float tHit;
+}
+```
+
 第二个相交检测函数是Shape::IntersectP(),用于预测相交是否会发生，这个检测通常比起完整的相交测试要更高效。这个函数可以被用来检测光源是否可以看到某个点，特别是用于阴影射线上。
 
 ### 6.1.4 相交坐标空间

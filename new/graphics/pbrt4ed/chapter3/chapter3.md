@@ -67,8 +67,43 @@ pbrt基于2维和3维元组类提供了2维和3维向量类
 
 > 略
 
-## 相交
+## 3.11 interaction类
 
-> 略
+SurfaceInteraction和MediumInteraction分别代表表面上的交点和有介质参加的交点的信息。例如：在第六章中，光线到物体的相交过程，是用SurfaceInteraction返回交点的微分几何信息。之后，在第十章中，纹理相关的代码会利用SurfaceInteraction来计算材质的属性。类似的，MediumInteraction类是用于光在介质中(比如烟雾，云)传播的场景。所有的这些实现放在interaction.h和interaction.cpp中
+
+SurfaceInteraction和MediumInteraction都继承自Interaction类，这个类提供了公共的成员变量和方法，这样做能让不同表面和介质的交互只与Interactions相关。
+
+> interaction类是把表面材质和光的介质的相互作用过程分离，这样做是为了让各种表面和各种介质的处理过程解耦化
+
+<<Interaction的定义>>
+
+```c++
+class Interaction {
+  public:
+    // <<Interaction的Public方法>> 
+    // <<Interaction的Public成员>> 
+};
+```
+
+这个类里有各种构造器，取决于构造的顺序和对应接收的参数的顺序，下列这个构造器是最通用的:
+
+<<Interaction的public方法>>
+
+```c++
+Interaction(Point3fi pi, Normal3f n, Point2f uv, Vector3f wo, Float time)
+    : pi(pi), n(n), uv(uv), wo(Normalize(wo)), time(time) {}
+```
+
+所有interaction都有一个p点，用Point3fi存储，是用Intervval来代表每个坐标的值。存储一个浮点值的区间而不是单个Float是为了表示在交点处的计算错误的边界，这种错误发生于p点在与光线相交计算的时候。这个信息有助于避免光线在离开表面时不正确的自相交现象，详见6.8.6
+
+<<Interaction的public成员>>
+
+```c++
+Point3fi pi;
+```
+
+### 3.11.1 SurfaceInteraction类
+
+表面上特定点的几何属性用SurfaceInteraction表示， 持有此类可以让大部分场景下，系统运行时不需要考虑这个点所对应的物体的几何特征。
 
 ## 延伸阅读

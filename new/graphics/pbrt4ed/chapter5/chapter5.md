@@ -701,4 +701,73 @@ RGB rgb = sensor->ToSensorRGB(L, lambda);
 
 去除萤火虫点的广泛做法是，把样本的贡献值都夹拢在最大量中。这么做会一引入一些错误：能量丢失了，然后图像不再是无偏于真实图像的。然而，当图像更关注美学而不是数学时，这种方式还是挺有效的。
 
+RGBFilm的maxComponentValue参数能被设置为夹拢的阈值，默认是无穷大，即不夹拢
+
+<<可选操作：夹拢感光器的RGB值>>
+
+```c++
+Float m = std::max({rgb.r, rgb.g, rgb.b});
+if (m > maxComponentValue)
+    rgb *= maxComponentValue / m;
+```
+
+给定一个可能被夹拢的RGB值，在其中的像素点会通过把光贡献量加到公式5.13的分子分母上
+
+<<用滤波器处理过的样本贡献量更新像素值>>
+
+```c++
+Pixel &pixel = pixels[pFilm];
+for (int c = 0; c < 3; ++c)
+    pixel.rgbSum[c] += weight * rgb[c];
+pixel.weightSum += weight;
+```
+
+AddSplat()方法首先重用从AddSample()的前两个部分，来计算对应辐射量L的RGB值
+
+<<RGBFilm方法定义>>
+
+```c++
+void RGBFilm::AddSplat(Point2f p, SampledSpectrum L,
+                       const SampledWavelengths &lambda) {
+    // <<把样本辐射量转换为PixelSensor的RGB值>> 
+    // <<可选：夹拢感光器的RGB值>> 
+    // <<对影响到的像素计算splat和splatBounds的边界>> 
+    for (Point2i pi : splatBounds) {
+        // <<在pi处应用滤波器，且添加溅射贡献量>> 
+    }
+}
+```
+
 ### 5.4.7 GBufferFilm类
+
+此类不但存储每个像素的RGB值，也存储了第一个可见相交点的额外几何信息。这个额外信息对于各种应用是很有用的，比如图像去噪算法，为机器学习提供训练数据等。
+
+<<GBufferFilm的定义>> 
+
+```c++
+class GBufferFilm : public FilmBase {
+  public:
+    // <<GBufferFilm的public方法>> 
+  private:
+    // <<GBufferFilm::Pixel的定义>> 
+    // <<GBufferFilm的private成员>> 
+};
+```
+
+除了Pixel结构体外，我们不会介绍此类的实现。Pixel被用于RGBFilm中，带了一些额外的字段，用于存储几何信息。同时也利用VarianceEstimator类，存了每个像素点的红绿蓝三色值，详见B.2.11。其他部分的实现是对RGBFilm的直接泛化，同时也更新了这些额外的值。
+
+<<GBufferFilm::Pixel的定义>>
+
+```c+=
+struct Pixel {
+    double rgbSum[3] = {0., 0., 0.};
+    double weightSum = 0., gBufferWeightSum = 0.;
+    AtomicDouble rgbSplat[3];
+    Point3f pSum;
+    Float dzdxSum = 0, dzdySum = 0;
+    Normal3f nSum, nsSum;
+    Point2f uvSum;
+    double rgbAlbedoSum[3] = {0., 0., 0.};
+    VarianceEstimator<Float> rgbVariance[3];
+};
+```

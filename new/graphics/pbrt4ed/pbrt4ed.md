@@ -52,7 +52,7 @@
 
 [第二章重点总结](chapter2/ch2_summary.md)
 
-## [第三章 几何和矩阵转换](chapter3/chapter3.md)
+## [第三章 几何及其变换](chapter3/chapter3.md)
 
 > 基础几何，线性代数知识介绍和复习
 

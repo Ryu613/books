@@ -44,7 +44,7 @@
     $$
     L_o(p, \omega_o) = L_e(p, \omega_o) + \int_{S^2}f(p, \omega_o,\omega_i)L_i(p,\omega_i)|\cos \theta_i|d\omega_i
     $$
-    > $L_o(p, \omega_o)$: 从p点沿$\omega_o$方向射出的光的辐射度(亮度)，这个$\omega_o$即射到相机点的方向
+    > $L_o(p, \omega_o)$: 从p点沿$\omega_o$方向射出的光的辐射度(亮度)，这个$\omega_o$即从交点射向相机点的方向
     >
     > $L_e(p, \omega_o)$: p点若自己是光源，要加上它自己的光辐射度
     >

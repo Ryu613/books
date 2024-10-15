@@ -10,6 +10,8 @@
 
 在[pbrt-v4](pbrt4ed/pbrt-v4)文件夹中,我梳理了项目源码核心流程和主要类的层次和函数
 
+在[pbrt-v4-digest-cn](https://github.com/Ryu613/pbrt-v4-digest-cn)中，对本书附带代码做了注释解读
+
 ## [Real-Time Rendering, Fourth Edition](rtr4/rtr4.md)
 
 阅读前置条件: 图形学基础

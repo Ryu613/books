@@ -510,21 +510,188 @@ b是维恩位移常数$2.8977721\times 10^{-3}m\,K$
 
 ## 4.5 光谱分布的表示
 
+![图4.16](img/fg4_16.png)
+
+图4.16 柠檬表面的反射光谱分布
+
+在真实世界中的光谱分布可能很复杂，我们已经见过各种复杂的光谱，在图4.16我们可以看到柠檬表面的反射光谱分布。为了渲染带有各种复杂光谱的场景，渲染器必须高效且精确地表示出光谱的分布情况。本节将介绍pbrt中对此的抽象和计算过程。对应的代码在util/spectrum.h和util/spectrum.cpp中
+
+我们会从定义可见光波长范围的常数开始。在pbrt中，波长的单位是纳米，这样对于人类来说更易读
+
+<<Spectrum的常数>>
+
+```c++
+constexpr Float Lambda_min = 360, Lambda_max = 830;
+```
+
 ### 4.5.1 Spectrum接口
 
-### 4.5.2 通用光谱分布
+在pbrt中，我们发现多种有用的光谱的表示，从根据波长来列出的光谱样本值，到函数的描述，比如黑体的函数。这引出了我们的第一个接口类，Spectrum，一个Spectrum对象对应了实现了一种光谱表示的实现。
 
-### 4.5.3 嵌入后的光谱数据
+Spectrum继承自TaggedPointer, 此类负责处理运行时的多态。TaggedPointer要求所有Spectrum的实现写到模板里的参数，这样能让TaggedPointer用独占的一个整数区别开每种类型。(详见B.4.4)
+
+<<Spectrum的定义>>
+
+```c++
+class Spectrum
+    : public TaggedPointer<ConstantSpectrum, DenselySampledSpectrum,
+                           PiecewiseLinearSpectrum, RGBAlbedoSpectrum,
+                           RGBUnboundedSpectrum, RGBIlluminantSpectrum,
+                           BlackbodySpectrum> {
+  public:
+    // <<Spectrum Interface>> 
+};
+```
+
+就像基于TaggedPointer的其他类一样，Spectrum定义了一个接口，必须被所有光谱的表示的实现类所实现。C++中典型的实现是定义一个纯虚函数，然后Spectrum的实现集成自Spectrum，然后实现这些方法。如果是用TaggedPointer的方式，接口是被隐式定义的，对于接口中的每个方法，在Spectrum中会有一个方法，分派到合适的实现类中来调用。我们会在此详述一个方法是如何实现的，但是其他的就省略了，因为大同小异。
+
+Spectrum最重要的方法是operator(), 这个方法取一个波长$\lambda$,然后返回这个波长的光谱分布值
+
+<<Spectrum接口>>
+
+```c++
+Float operator()(Float lambda) const;
+```
+
+这个方法对应的实现简短又细致。调用TaggedPointer::Dispatch()方法，来开始分派此方法的调用。TaggedPointer类存储了一个整数的标签，以及连带着对象编码后的类型的指针。然后，Dispatch()就能在运行时决定特定的类型。之后，带着这个指针来调用回调函数，转换到实际类型的指针。
+
+一个叫op的lambda函数，拿到了这个auto类型的指针，在C++17中，这种lambda函数扮演了模板函数的角色。用具体的类型来调用它，就类似实例化了这个类型的lambda表达式
+
+<<Spectrum的内联方法定义>>
+
+```c++
+inline Float Spectrum::operator()(Float lambda) const {
+    auto op = [&](auto ptr) { return (*ptr)(lambda); };
+    return Dispatch(op);
+}
+```
+
+Spectrum的实现也必须提供一个MaxValue()方法，返回在波长范围内，光谱分布的最大边界值。这个方法在pbrt中，主要用于计算光源发出的辐射边界值，这样的话，光就能根据场景中期望的光照贡献值来采样。
+
+<<Spectrum接口>>
+
+```c++
+Float MaxValue() const;
+```
+
+### 4.5.2 普遍的光谱分布
+
+定义好了Spectrum接口，我们开始定义一些Spectrum类的实现，来显式地列出光谱分布函数的值。其中ConstantSpectrum是最简单的，它代表了所有波长下光谱分布的常数值。在pbrt中最普遍的用法是定义一个为0的光谱分布，用来表示散射效果不存在。
+
+ConstantSpectrum的实现很直接了当，我们在此省略了MaxValue()。注意，此类没有继承自Spectrum。这个地方与传统的C++虚函数抽象基类不同，我们是用了C++的类型系统，故在ConstantSpectrum和Spectrum之间没有显式的关联。
+
+> 由TaggedPointer的标签指针实现多态性，不是由C++的虚函数实现的多态性
+
+<<Spectrum的定义>>
+
+```c++
+class ConstantSpectrum {
+  public:
+    ConstantSpectrum(Float c) : c(c) {}
+    Float operator()(Float lambda) const { return c; }
+  private:
+    Float c;
+};
+```
+
+DenselySampledSpectrum更具表达性，这个类存储了一个光谱分布，这个光谱分布是在给定波长范围内，以间隔1nm来采样的
+
+<<Spectrum的定义>>
+
+```c++
+class DenselySampledSpectrum {
+  public:
+    // <<DenselySampledSpectrum Public Methods>> 
+  private:
+    // <<DenselySampledSpectrum Private Members>> 
+};
+```
+
+### 4.5.3 内嵌的光谱数据
 
 ### 4.5.4 采样后的光谱分布
 
+细心的读者可能注意到，虽然Spectrum类让计算光谱分布函数变得可能，但是除了在特定波长上采样以外，没有能力做更多的计算。比如，要计算反射公式的积分值，需要取两个光谱分布的乘积，一个用于BSDF，另一个用于入射光辐射量的函数。
+
+使用目前引入的抽象来提供这种功能会很快变得难以管理。例如，虽然两个 DenselySampledSpectrum（密集采样光谱）的乘积可以被准确地表示为另一个 DenselySampledSpectrum，但考虑两个 PiecewiseLinearSpectrum（分段线性光谱）的乘积：其结果将是分段二次函数，并且后续的乘积运算只会进一步增加函数的阶数。此外，不同类型的 Spectrum 实现之间的运算不仅需要为每一对类型组合提供一个自定义实现，还需要为每个结果选择一个合适的 Spectrum 表示方式。
+
+> 也就是在Spectrum里面实现不同类型的Spectrum相乘很麻烦，会提高代码复杂度
+
+pbrt避免了这种复杂性，避免方法是把一组离散的波长看作蒙特卡洛积分的一部分，这个积分已经是图像合成时已有的一部分。为了理解其中机理，考虑在某个关注的波长范围$[\lambda_0,\lambda_1]$里，有一面上的一点p，法线为n，要计算它的(非光谱的)辐照度,使用4.7式(用于表达根据入射光辐射量的辐照度)，和4.5式(用于根据光谱辐射度表达辐射度)，我们有下式:
+
+$$
+E=\int_\Omega\int_{\lambda_0}^{\lambda_1}L_i(p, \omega,\lambda)|\cos \theta |d\omega d\lambda
+$$
+
+这里的$L_i(p, \omega,\lambda)$是入射光在波长$\lambda$的光谱辐射度
+
+运用标准蒙特卡洛估计，并利用$\lambda$和$\omega$是不相关的事实，我们能看到E的估计值可以用在某种概率分布$p_\omega$上的$\omega_i$方向上，和以某种概率分布$p_\lambda$的波长$\lambda_i$来进行采样的比值的累加的平均值来估计，如下式:
+
+$$
+E \approx \frac{1}{n}\sum_{i=1}^n\frac{L_i(p, \omega_i,\lambda_i)|\cos \theta_i|}{p_\omega(\omega_i)p_\lambda(\lambda_i)}
+$$
+
+因此我们只需要能够在特定离散的波长下计算积分，就能估计辐照度。更普遍的说，我们能在波长的积分下表达所有光谱量。比如，在章节4.6中，展示了使用RGB色彩来渲染图片，每个像素点的颜色可以用到达某个像素点以红绿蓝的响应来建模的的光谱辐射量的积分来计算。pbrt因此只使用了离散的光谱样本来做光谱计算。
+
+> 用蒙特卡洛法，对某个波长下的某个角度进行辐射量的采样，然后根据概率密度做加权，就可以估计出辐照度，不用直接算这个积分。采样的波长和方向也可以在区域里面自己选
+
+所以，我们能继续实现关于光谱采样和用光谱样本计算，我们会定义一个常数，用于设置光谱样本的数量。(章节4.6.5会详述这个值选取的权衡)。pbrt默认使用4种波长的样本，这个值改起来很方便，但是改完要重新编译系统。
+
+<<Spectrum的常数>>
+
+```c++
+static constexpr int NSpectrumSamples = 4;
+```
+
 #### SampledSpectrum
+
+SampledSpectrum类存储了一组NSpectrumSamples的值，用于表示离散波长下光谱分布的值。这个类提供了对这些光谱分布的各种数学计算操作
+
+<<SampledSpectrum的定义>>
+
+```c++
+class SampledSpectrum {
+  public:
+    // <<SampledSpectrum Public Methods>> 
+  private:
+    pstd::array<Float, NSpectrumSamples> values;
+};
+```
 
 #### SampledWaveLengths
 
-这个类存储了某个有样本的SampledSpectrum对象的波长。这样做不仅能跟踪某个独立的SampledSpectrum的SampledWavelengths，而且也不会在具有多个波段样本的SampledSpectrums的时候有任何组合操作
+这个类存了每个样本的波长值，SampledSpectrum存了对应的样本。二者分离开是重要的，这样不仅能跟踪某个独立的SampledSpectrum对应的SampledWavelengths，而且也不会把不同采样波长的SampledSpectrums合并起来。
 
 为了在蒙特卡洛积分下使用，波长被存于SampledWavelengths, 必须根据某种概率分布来采样，因此，这个类储存了波长本身，同时也存了每个波长的概率密度
+
+<<SampledWavelengths的private成员>>
+
+```c++
+pstd::array<Float, NSpectrumSamples> lambda, pdf;
+```
+
+采样波长最简单的方法就是在给定区间内均匀采样，这种方法在SampleUniform()方法实现，传入均匀样本量u和波长范围。
+
+<<SampledWavelengths的public方法>>
+
+```c++
+static SampledWavelengths SampleUniform(Float u,
+        Float lambda_min = Lambda_min, Float lambda_max = Lambda_max) {
+    SampledWavelengths swl;
+    // <<用u采样第一个波长>> 
+    // <<对剩余的波长进行初始化>> 
+    // <<为采样的波长计算PDF>> 
+    return swl;
+}
+```
+
+这个方法在给定的区间内均匀的取第一个波长
+
+<<用u采样第一个波长>>
+
+```c++
+swl.lambda[0] = Lerp(u, lambda_min, lambda_max);
+```
 
 ## 4.6 色彩
 

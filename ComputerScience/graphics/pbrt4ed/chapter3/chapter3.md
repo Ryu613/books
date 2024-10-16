@@ -1,6 +1,6 @@
 # 3 几何及其变换
 
-## 坐标系统
+## 3.1 坐标系统
 
 pbrt中，使用三维直角坐标系。某个点的坐标取决于所使用的坐标系统和位置，但是这个点的绝对位置是固定的。
 
@@ -17,13 +17,13 @@ $$
 
 所以，为了定义一个坐标系，我们需要原点和基向量，但是我们只能在这个坐标系里表示点和向量，在其他坐标系就不同了。因此我们定义一个标准坐标系,即原点(0,0,0),基向量x,y,z就是三个坐标轴,其他的坐标系会基于这个标准坐标系来定义，这种方式叫世界空间(world space)。
 
-### 左/右手坐标系
+### 3.1.1 左/右手坐标系
 
 作者在这里叙述了左右手坐标
 
 > 简单来说，我们把x都指向右侧，y都指向上的时候，z轴朝远处就是左手坐标系，朝近处就是右手坐标系。
 
-## n-元组基类
+## 3.2 n-元组基类
 
 pbrt的类都是基于n-元组(tuple)的类来实现的。这些文件定义在/util/vecmath.h中。
 
@@ -31,41 +31,84 @@ pbrt的类都是基于n-元组(tuple)的类来实现的。这些文件定义在/
 
 > 后续文章主要介绍了Tuple2,和Tuple3,这里不详述
 
-## 向量
+## 3.3 向量
 
 pbrt基于2维和3维元组类提供了2维和3维向量类
 
 > 后续文章介绍了vector类的用法和向量相关的计算基础，此处略
 
-## 点
+## 3.4 点
 
 在pbrt里，有Point2和Point3类，来表示点。
 
-> 后续段落讲了这些类的使用，略过
+## 3.5 法线
 
-## 法线
+## 3.6 射线
 
-> 法线的定义和在pbrt中的实现，略
+### 3.6.1 射线的微分量
 
-## 射线
+为了在使用纹理函数时(第十章会讲)更好的反走样，pbrt中定义了RayDifferential类，这个类是Ray对象的子类，包含了两条辅助射线的额外信息。这些额外的射线代表相机在胶片平面上的某个样本的x和y方向的偏移量。通过确定三条光线在被着色物体上的投影面积，某个Texture对象就可以估计出一个需要进行平均处理的面积，用来抗锯齿。
 
-> Ray类和RayDifferential类(射线微分量)在pbrt的实现的介绍，略
+由于RayDifferential继承自Ray,系统中的几何体接口就可被取到常量的Ray的引用参数，因此不管是Ray还是RayDifferential,都能传给它们。只有为了抗锯齿和纹理有要求时，才会需要RayDifferential参数。
 
-## 包围盒
+<<RayDifferential的定义>>
 
-> 包围盒的理论和实现，略
+```c++
+class RayDifferential : public Ray {
+  public:
+    // <<RayDifferential Public Methods>> 
+    // <<RayDifferential Public Members>> 
+};
+```
 
-## 球面几何学
+RayDifferential的构造器跟Ray的一样
 
-< 球面几何介绍，和相关函数，略
+<<RayDifferential的public方法>>
 
-## 矩阵转换
+```c++
+RayDifferential(Point3f o, Vector3f d, Float time = 0.f,
+                Medium medium = nullptr)
+    : Ray(o, d, time, medium) {}
+```
 
-> 略
+在一些情况下，微分化的射线可能不能使用。处理中若要取RayDifferential，应该在取此对象前，先检查hasDifferentials成员
 
-## 矩阵转换的应用
+<<RayDifferential的public成员>>
 
-> 略
+```c++
+bool hasDifferentials = false;
+Point3f rxOrigin, ryOrigin;
+Vector3f rxDirection, ryDirection;
+```
+
+还有一个从Ray里构造RayDifferential的构造器，跟之前的构造器一样，hasDifferentials的值默认是false
+
+<<RayDifferential的public方法>>
+
+```c++
+explicit RayDifferential(const Ray &ray) : Ray(ray) {}
+```
+
+在pbrt中Camera的实现，会为离开相机的射线计算微分量，这些射线基于了一个假设：相机射线间隔一个像素。积分器一般为每个像素点生成多条相机射线，在这种场景下，样本之间的距离更近，所以微分量就要对应进行更新。如果这个因素没考虑到，那么图像中的纹理就会变得很模糊。下方的ScaleDifferentials()方法就是用来处理这种情况的，给定一个估计的样本间距s即可。例如在第一章的<<为当前样本生成相机射线>>代码块里就调用了此方法
+
+<<RayDifferential的public方法>>
+
+```c++
+void ScaleDifferentials(Float s) {
+    rxOrigin = o + (rxOrigin - o) * s;
+    ryOrigin = o + (ryOrigin - o) * s;
+    rxDirection = d + (rxDirection - d) * s;
+    ryDirection = d + (ryDirection - d) * s;
+}
+```
+
+## 3.7 包围盒
+
+## 3.8 球面几何学
+
+## 3.9 几何变换
+
+## 3.10 几何变换的应用
 
 ## 3.11 相互作用
 

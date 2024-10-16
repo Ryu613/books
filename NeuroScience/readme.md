@@ -8,6 +8,8 @@
 
 ## 4. Theoretical Neuroscience: Computational and Mathematical Modeling of Neural Systems
 
+## 5. Fundamentals of Computational Neuroscience: Third Edition
+
 ## 参考资料
 
 1. [神经科学教材](https://zhuanlan.zhihu.com/p/271676465)

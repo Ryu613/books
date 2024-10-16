@@ -9,3 +9,4 @@
 ## 参考资料
 
 1. [入门书籍](https://zhuanlan.zhihu.com/p/271676465)
+2. [计算神经科学](https://zhuanlan.zhihu.com/p/275642796)

@@ -1,19 +1,23 @@
-# books
+# 书籍分类
 
-个人读书和学习总结之地，目前主要包含计算机理论和技术内容，也有部分个人爱好的其他学科的学习记录
+## 计算机科学
 
-## [新目录](new/readme.md)
+### 1. [图形学](ComputerScience/graphics/readme.md)
 
-### [计算机图形学](new/graphics/readme.md)
+### 2. [C++](ComputerScience/C++/readme.md)
 
-### [C++](new/C++/readme.md)
+### 3. [AI](ComputerScience/AI/readme.md)
 
-## [文章](article/readme.md)
+## [神经科学](NeuroScience/readme.md)
 
-由本人独立撰写，应该是本项目最有价值的部分，感兴趣可以查看
+## [管弦作曲](OrchestralComposition/readme.md)
 
-目前内容还不多，后续会不断扩展
+## [物理学](physics/readme.md)
 
-## [导图](mindmap)
+## [数学](Math/readme.md)
 
-旧年的学习总结，新的都在新目录下面
+## [复杂性科学](Complexity/readme.md)
+
+## [天文学](Astronomy/readme.md)
+
+## [人文学科](Humanities/readmme.md)

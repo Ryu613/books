@@ -154,3 +154,131 @@ void StartPixelSample(Point2i p, int sampleIndex, int dimension) {
 ## 8.7 Sobol采样器
 
 ## 8.8 图像重建
+
+就如5.4.3所述，Film对象中的每个像素点，根据估计式计算出积分值，这个积分是从图像函数中采样，通过滤波函数取出的值的乘积。在章节8.1，我们会看到采样理论提供了一个数学基础，这个基础让我们直到为了达到抗锯齿的结果，滤波操作应该如何实现。我们应当遵从以下原则:
+
+1. 从一组图像采样中重建一个连续的图像函数
+2. 对该函数进行预滤波，以去除像素间距的奈奎斯特极限以外的任何频率
+3. 在像素的位置把预滤波函数处理后的值做采样，用来计算最终像素值
+
+### 8.8.1 Filter接口
+
+Filter类定义了pbrt中像素的重建滤波器接口。在base/filter.h中。
+
+<<Filter的定义>>
+
+```c++
+class Filter :
+        public TaggedPointer<BoxFilter, GaussianFilter, MitchellFilter,
+                             LanczosSincFilter, TriangleFilter> {
+  public:
+    // <<Filter Interface>> 
+};
+```
+
+所有滤波器都是二维函数，原点在中央位置，并且定义了一个半径，超过半径的值为0。x和y方向的半径是不同的，但是被假设为互相同步的。一个滤波器通过Radius()方法提供它的半径，滤波器在每个方向上总体的范围是半径的两倍，见图8.49
+
+![图8.49](img/fg8_49.png)
+图8.49 在pbrt的滤波器范围根据每个像素点从原点到剪切点的半径来定的。滤波器支持的范围是总体非零的区域，在这里是等于半径的两倍
+
+<<filter的接口>>
+
+```c++
+Vector2f Radius() const;
+```
+
+Filter的实现也必须提供一个方法，来计算他们的滤波函数，这个函数可能会被滤波器范围外的点调用，在这种情况下，实现类的责任是检测出这种情况，然后返回0。对于滤波器从Evaluate()返回的值来说，不要求积分到1，因为是使用公式5.13这样的估计式来计算像素点的值的，这个值是已归一化的。
+
+<<Filter的接口>>
+
+```c++
+Float Evaluate(Point2f p) const;
+```
+
+滤波器也必须提供一个重要性采样方法，Sample(),这个方法取一个二维随机点u，值域在[0,1)
+
+<<Filter的接口>>
+
+```c++
+FilterSample Sample(Point2f u) const;
+```
+
+返回的FilterSample结构体存储了采样后的p点位置和权重，这个权重值是滤波函数在p点的值，比上所使用的采样方法的PDF的值。因为一些滤波器能从它们的分布里准确的采样，直接返回这个比率能够让其根据计算两个值决定返回0还是比率的麻烦减少。
+
+<<FilterSample的定义>>
+
+```c++
+struct FilterSample {
+    Point2f p;
+    Float weight;
+};
+```
+
+给定了这个接口的特性后，我们能实现GetCameraSample()函数，这个函数在大部分积分器中，用于计算传入到Camera::GenerateRay()方法中的CameraSamples对象
+
+<<Sampler的内联函数>>
+
+```c++
+template <typename S>
+CameraSample GetCameraSample(S sampler, Point2i pPixel, Filter filter) {
+    FilterSample fs = filter.Sample(sampler.GetPixel2D());
+    CameraSample cs;
+    // <<初始化CameraSample的成员变量>> 
+    return cs;
+}
+```
+
+这个函数里的一个细节是，这个函数被传入的采样器的类型模板化。若是值类型的Sampler对象传到了这个方法，那么这个函数会用pbrt的动态分派机制来处理，来调用Sampler实现类中对应的方法。然而，若是一个构造类型的采样器(比如Halton采样器)传入了进来，那么对应的方法会被直接调用(通常是在函数里以内联方式展开)。这种能力被用于改进pbrt在GPU上的渲染性能，详见15.3.3
+
+在滤波器通过Sample()方法返回FilterSample后，图像采样的位置就能被找到，找到的方法是通过在像素坐标上加上滤波器采样样本的偏移值，然后在每个维度上加上0.5，来把离散的值映射到连续的像素坐标上(回顾8.1.4)。滤波器的权重随着CameraSample来传入，所以当Film调用AddSample()是可以被获取到。
+
+<<初始化CameraSample的成员变量>>
+
+```c++
+cs.pFilm = pPixel + fs.p + Vector2f(0.5f, 0.5f);
+cs.time = sampler.Get1D();
+cs.pLens = sampler.Get2D();
+cs.filterWeight = fs.weight;
+```
+
+### 8.8.2 FilterSampler类
+
+不是所有Filter实现类都能轻松地根据它们的滤波函数的分布来采样。因此pbrt提供了FilterSampler类，来封装采样细节，封装是基于滤波器列表化的表示来实现的。
+
+<<FilterSampler的定义>>
+
+```c++
+class FilterSampler {
+  public:
+    // <<FilterSampler Public Methods>> 
+  private:
+    // <<FilterSampler Private Members>> 
+};
+```
+
+在构造器中，只需提供内存分配器和Filter类就可以了。我们发现让调用者指定滤波器函数的采样速率以构建用于采样的表格并不是特别有用，因此我们硬编码了一个采样速率，即在每个维度的单位滤波器范围内进行 32 次采样。
+
+<<FilterSampler的成员定义>>
+
+```c++
+FilterSampler::FilterSampler(Filter filter, Allocator alloc)
+    : domain(Point2f(-filter.Radius()), Point2f(filter.Radius())),
+      f(int(32 * filter.Radius().x), int(32 * filter.Radius().y), alloc),
+      distrib(alloc) {
+    <<Tabularize unnormalized filter function in f>> 
+    <<Compute sampling distribution for filter>> 
+}
+```
+
+domain给出了滤波器的边界，f存储了列表化的滤波器函数的值
+
+<<FilterSampler的private成员>>
+
+```c++
+Bounds2f domain;
+Array2D<Float> f;
+```
+
+8.8.3 方框滤波器
+
+在图形学中最普遍的滤波器就是方框滤波器(并且，事实上，如果每特别说明，默认就是方框滤波器)。方框滤波把图像矩形区域内的压样本点视为相同权重。虽然计算效率高，但是可能是最差的滤波器。

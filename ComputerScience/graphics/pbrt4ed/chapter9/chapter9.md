@@ -225,11 +225,74 @@ Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
           BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
 ```
 
-### 9.1.3 半球面上的反射
+### 9.1.3 半球面上的反射率
 
-### 9.1.4 BSDF的偏移分布
+BxDF的方法介绍了以后，就可以实现计算一个BxDF对象的反射率了，计算方法是根据公式4.12和4.13来在反射率上应用蒙特卡洛估计。
 
-### 9.1.5 多种BSDF
+BxDF::rho()计算反射率函数$\rho_{hd}$。 这个方法的调用者要负责确定获取样本的数量，并且提供一个均匀采样值用来计算估计值。因此，调用者拥有对采样和返回的估计值的质量的控制权。
+
+<<BxDF方法的定义>>
+
+```c++
+SampledSpectrum BxDF::rho(Vector3f wo, pstd::span<const Float> uc,
+                          pstd::span<const Point2f> u2) const {
+    SampledSpectrum r(0.);
+    for (size_t i = 0; i < uc.size(); ++i) {
+        <<Compute estimate of >> 
+    }
+    return r / uc.size();
+}
+```
+
+每一项的估计式子
+
+$$
+\frac{1}{n}\sum_j^n\frac{f_r(\omega, \omega_j)|\cos \theta_j|}{p(\omega_j)}
+$$
+
+就很容易估计出来了
+
+<<计算$\rho_{hd}$的估计值>>
+
+```c++
+pstd::optional<BSDFSample> bs = Sample_f(wo, uc[i], u2[i]);
+if (bs)
+    r += bs->f * AbsCosTheta(bs->wi) / bs->pdf;
+```
+
+半球-半球的反射率在第二个BxDF::rho()方法，这个方法计算狮子4.13，与上一个rho()方法一样，调用者要负责传入一个均匀采样的值，在这种情况下，需要五个参数才够。
+
+<<BxDF的方法定义>>
+
+```c++
+SampledSpectrum BxDF::rho(pstd::span<const Point2f> u1,
+        pstd::span<const Float> uc, pstd::span<const Point2f> u2) const {
+    SampledSpectrum r(0.f);
+    for (size_t i = 0; i < uc.size(); ++i) {
+        <<Compute estimate of rho hh>> 
+
+    }
+    return r / (Pi * uc.size());
+}
+```
+
+我们的第一个实现类均匀地在半球上采样第一个向量$\omega_o$，给出了这个量，就可以用BxDF::Sample_f()来采样出来。
+
+<<计算$\rho_{hh}$的估计值>>
+
+```c++
+Vector3f wo = SampleUniformHemisphere(u1[i]);
+if (wo.z == 0)
+    continue;
+Float pdfo = UniformHemispherePDF();
+pstd::optional<BSDFSample> bs = Sample_f(wo, uc[i], u2[i]);
+if (bs)
+    r += bs->f * AbsCosTheta(bs->wi) * AbsCosTheta(wo) / (pdfo * bs->pdf);
+```
+
+### 9.1.4 BSDF的delta分布
+
+### 9.1.5 各种BSDF
 
 ## 9.2 漫反射
 

@@ -1,6 +1,6 @@
 # 复杂性科学
 
-## 1. 复杂(Complexity: A Guided Tour)
+## 复杂(Complexity: A Guided Tour)
 
 ## 参考资料
 

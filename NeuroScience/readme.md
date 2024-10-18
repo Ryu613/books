@@ -1,14 +1,14 @@
 # 神经科学
 
-## 1. 神经科学原理
+## 神经科学原理
 
-## 2. [神经科学：探索脑](神经科学-探索脑.md)
+## [神经科学：探索脑](神经科学-探索脑.md)
 
-## 3. [思考 快与慢](思考,快与慢.md)
+## [思考 快与慢](思考,快与慢.md)
 
-## 4. Theoretical Neuroscience: Computational and Mathematical Modeling of Neural Systems
+## Theoretical Neuroscience: Computational and Mathematical Modeling of Neural Systems
 
-## 5. Fundamentals of Computational Neuroscience: Third Edition
+## Fundamentals of Computational Neuroscience: Third Edition
 
 ## 参考资料
 

@@ -1,12 +1,14 @@
 # 管弦作曲
 
+> [个人作曲](https://github.com/Ryu613/musical-composition)
+
 ## 乐理
 
 ### The.Complete.Idiot's.Guide.To.Music.Theory 2ed
 
 ## 和声
 
-### 调性和声及20世纪音乐概述(和声)
+### 调性和声及20世纪音乐概述
 
 ### 和声学基础(斯波索宾)
 

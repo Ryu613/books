@@ -453,6 +453,19 @@ $$
 
 PixelSensor类实现了pbrt的半理想的像素色彩度量模型。定义于film.h和film.cpp下
 
+<<PixelSensor的定义>>
+
+```c++
+class PixelSensor {
+  public:
+    // <<PixelSensor Public Methods>> 
+    // <<PixelSensor Public Members>> 
+  private:
+    // <<PixelSensor Private Methods>> 
+    // <<PixelSensor Private Members>> 
+};
+```
+
 PixelSensor对感光器的像素色彩度量进行了半理想化的建模:
 
 1. 曝光控制: 图像明暗可以由用户控制

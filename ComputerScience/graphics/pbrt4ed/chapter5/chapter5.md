@@ -474,6 +474,112 @@ PixelSensor对感光器的像素色彩度量进行了半理想化的建模:
    来模拟人类视觉系统中的色彩适应过程。因此，捕获的图像在视觉上看起来与
    人类观察者在拍照时记忆中的图像相似
 
+pbrt包含了一个真实感相机模型，也是基于投影矩阵的理想模型。因为真空详见有一个无限小的光圈。我们在PixelSensor的是线上做了程序上的折衷，这样的话用针孔模型渲染的图像就不是完全黑的。我们留下了Camera的响应作用，用来对光圈尺寸效应的建模。理想化的模型不会考虑此，尽管RealisticCamera在<<为RealisticCamera光线计算权重>>里确实这样做了。PixelSensor之后只会考虑快门时间和ISO的设置。这两个因素被包含在一个量里，叫做成像比(imaging ratio)。
+
+PixelSensor构造器取感光器的RGB匹配函数-$\bar{r},\bar{g}$和$\bar{b}$, 把成像比作为参数。同时，它也会根据用于要求输出的RGB值来取颜色空间，也会取光照的光谱，这个光谱定义了场景中什么颜色是白色。把这些参数合在一起，就能够在感光器的测量下，把光谱能量转换为RGB，然后输出为颜色空间中的RGB。
+
+图5.19表示了对相机响应建模的效果，对比用XYZ匹配函数来计算初始像素值来渲染，和用确切相机感光器的匹配函数来渲染。
+
+<<PixelSensor Public Methods>>
+
+```c++
+PixelSensor(Spectrum r, Spectrum g, Spectrum b,
+       const RGBColorSpace *outputColorSpace, Spectrum sensorIllum,
+       Float imagingRatio, Allocator alloc)
+    : r_bar(r, alloc), g_bar(g, alloc), b_bar(b, alloc),
+      imagingRatio(imagingRatio) {
+    <<从相机RGB矩阵计算XYZ>> 
+}
+```
+
+<<PixelSensor Private Members>>
+
+```c++
+DenselySampledSpectrum r_bar, g_bar, b_bar;
+Float imagingRatio;
+```
+
+感光器像素记录光的RGB颜色空间与用户定义的最终图像的RGB颜色空间一般来说不一样。颜色空间的形式一般来说是针对某种相机的，并且受它的像素的颜色滤光片的物理属性决定，最终图像的RGB颜色空间，类似sRGB的颜色空间，或在4.6.3中的其他颜色空间的一种，一般来说，是根据设备不同而不同。因此，PixelSensor的构造器计算一个$3 \times 3$的矩阵，用来把RGB空间转换为XYZ。从这里，能很轻松的转换为特定的输出颜色空间。
+
+这个矩阵的发现是从解决一个优化问题中得来的。它开始于超过二十种光谱分布，表示来自标准色卡上各种颜色色块的反射率。这个构造器会计算这些色块的RGB颜色(在相机颜色空间中，也包括输出颜色空间光照下的XYZ颜色)。如果这些颜色被对应列向量所代表，那么我们能考虑一个$3 \times 3$的矩阵M下的问题:
+
+$$
+M
+\begin{bmatrix}
+r_1 & r_2 & {\cdots} & r_n \\
+g_1 & g_2 & {\cdots} & g_n \\
+b_1 & b_2 & {\cdots} & b_n \\
+\end{bmatrix} \approx
+\begin{bmatrix}
+x_1 & x_2 & {\cdots} & x_n \\
+y_1 & y_2 & {\cdots} & y_n \\
+z_1 & z_2 & {\cdots} & z_n \\
+\end{bmatrix}
+$$
+
+同时，只要有超过三种反射率值，问题就会成为一个超定问题，可以通过线性最小二乘法来求解。
+
+<<从相机RGB矩阵计算XYZ>> 
+<<计算用于训练的色块的相机RGB值>>
+<<为用于训练的色块计算xyzOutput值>>
+<<利用线性最小二乘法来初始化XYZFromSensorRGB>>
+
+给定感光器的光照量，为每个被ProjectReflectance()处理的反射率计算RGB的相关系数
+
+<<计算用于训练的色块的相机RGB值>>
+
+```c++
+Float rgbCamera[nSwatchReflectances][3];
+for (int i = 0; i < nSwatchReflectances; ++i) {
+    RGB rgb = ProjectReflectance<RGB>(swatchReflectances[i], sensorIllum,
+                                      &r_bar, &g_bar, &b_bar);
+    for (int c = 0; c < 3; ++c)
+        rgbCamera[i][c] = rgb[c];
+}
+```
+
+为了得到比较好的结果，被用于改良问题的光谱应该代表了一个比较好的表示现实世界的光谱的量。在pbrt中使用的是基于标准色谱表光谱测量量。
+
+<<PixelSensor Private Members>>
+
+```c++
+static constexpr int nSwatchReflectances = 24;
+static Spectrum swatchReflectances[nSwatchReflectances];
+```
+
+ProjectReflectance()工具方法为一个反射率取其光谱分布，并且有一个光照量，也还有三个光谱匹配函数$\bar{b_i}$对应三原色的颜色空间。这个方法返回一个三项式的相关系数$c_i$，由下式给出:
+
+$$
+c_i = \int r(\lambda)L(\lambda)\bar{b_i}(\lambda)d\lambda
+$$
+
+r是光谱反射率函数，L是光照的光谱分布，$\bar{b_i}$是一个光谱匹配函数。在第二个匹配函数$\bar{b_2}$一般来说对应了亮度或者至少绿色的假设下，这个颜色在人类视觉系统中有最大的反馈。返回的颜色的三项是被$\int L(\lambda)\bar{b_2}(\lambda)d\lambda$归一化了。在这种方法下，线性最小二乘法的你和至少根据视觉的重要性粗略地对每对RGB/XYZ进行加权。
+
+#### 色彩适应和白平衡
+
+#### 感光器响应的采样
+
+由于在PixelSensor中的感光器响应函数描述了感光器根据辐射量给出的基于波长的响应，当对光的波长进行采样时，至少近似地估计辐射量的变化是有意义的。最少，辐射量为0的光线波长应该不被采样，这样的话，波长就对最终图像没有贡献了。更普遍的来说，根据感光器响应函数来做重要性采样是必要的，这种方式提供了减少5.8估计式的错误。
+
+然而，选取采样所用的分布具有挑战性，因为目标是最小化人类观察到的错误，而不是严格地最小化数字上的错误。图5.21(a)展示了CIE Y匹配函数和X,Y,Z的总和的匹配函数，两者都可能被使用。实际中，根据Y来采样会给出超量的色彩噪点，但是基于三个匹配函数的和来采样会导致在400~500nm间波长的样本过多，这些样本在视觉呈现上相对不太重要。
+
+一个参数化的概率分布函数，用于平衡这些关注点，并且对于在可见波长段中采样挺好用的,即下式:
+
+$$
+p_v(\lambda)=(\int_{\lambda_{min}}^{\lambda_{max}}f(\lambda)d\lambda)^{-1}f(\lambda) \tag{5.9}
+$$
+
+其中:
+
+$$
+f(\lambda)=\frac{1}{\cos h^2(A(\lambda - B))}
+$$
+
+$A = 0.0072nm^{-1}, B=538nm$,图5.21(b)展示了$p_v(\lambda)$的图
+
+![图5.21](img/fg5_21.png)
+图5.21 (a) CIE Y 匹配函数的归一化的PDF，和X,Y,Z总的的匹配函数 (b) 根据公式5.9推出的参数化的分布$p_v(\lambda)$
+
 ### 5.4.3 图像采样的滤波
 
 Film的实现主要负责把每个像素点的光谱样本聚合在一起，用于计算最终值。在现实中的相机，每个像素会在很小的区域上聚集光。这些像素的感应可能在这个小区域的空间上有微小差别，这取决于感光器的物理设计。在第八章，我们会用信号处理的角度来考虑此种操作，然后我们会看到图像函数是在哪个地方采样的，和这些样本的权重如何极大的影响最终图像的质量

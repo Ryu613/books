@@ -10,7 +10,7 @@
 >
 > pbrt代码本人注解版(fork自原始代码): [pbrt-v4-digest-cn](https://github.com/Ryu613/pbrt-v4-digest-cn)
 
-
+目前第一遍进行中，自学用
 
 ## [第一章 绪论](chapter1/chapter1.md)
 
@@ -54,7 +54,7 @@
 
 ## [第九章 反射模型](chapter9/chapter9.md)
 
-> 双向散射函数
+> 双向散射分布函数介绍及实现
 
 ## [第十章 纹理和材质](chapter10/chapter10.md)
 

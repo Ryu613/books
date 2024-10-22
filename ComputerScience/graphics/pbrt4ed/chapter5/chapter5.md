@@ -159,8 +159,6 @@ CameraTransform::CameraTransform(const AnimatedTransform &worldFromCamera) {
 }
 ```
 
-
-
 ### 5.1.2 CameraBase类
 
 Camera接口的通用函数放到CameraBase中，其他相机类皆继承此类。关于camera的实现的相机类都放在cameras.h下面
@@ -273,76 +271,73 @@ struct CameraBaseParameters {
 
 三维空间下的观察问题在三维图形学下是最基本的问题之一，即，如何把3D场景展示在二维图像上。最经典的解决方法是用$4\times 4$矩阵来实现。因此，我们会介绍一个投影矩阵的相机类，叫ProjectiveCamera，然后基于它，定义2个相机模型。第一个实现是正交投影，另一个实现是透视投影，这两种是最经典和广泛运用的投影类型。
 
-正交和透视投影都需要定义2个与观察方向垂直的平面，近平面和远平面，当渲染在光栅化的时候，不在这两个平面内的物体会被剔除，最终图像中就没有这些物体。(剔除近平面前面的物体是非常重要的，为了防止物体深度为0时计算投影出现问题，把相机背后的物体错误地映射到了前面)
+正交和透视投影都需要定义2个与观察方向垂直的平面，近平面和远平面，当用光栅化渲染的时候，不在这两个平面内的物体会被剔除，最终图像中就没有这些物体。(剔除近平面前面的物体是非常重要的，这是为了防止物体深度为0时的奇点问题，同时避免把相机背后的物体错误地映射到了前面)
 
-> 当物体深度接近或等于0时，计算时导致结果为无穷大或未定义，导致奇点问题(不可控现象，比如黑块，闪烁，消失)。深度值为负时，若计算没有加排除负值的判断，会导致相机后面的物体会跑到前面来
+> 在光栅化渲染下，当物体深度接近或等于0时，计算时导致结果为无穷大或未定义，导致奇点问题(不可控现象，比如黑块，闪烁，消失)。深度值为负时，若计算没有加排除负值的判断，会导致相机后面的物体会跑到前面来
 
-对于光追器来说，投影矩阵只是单纯用来检测离开相机的光，没有考虑相机后面的情况，所以会出现此问题
+对于光追器来说，投影矩阵只是单纯用来确定离开相机的光线，这些问题并不适用，因此，在这种情况下，过分担心设置这些平面的深度值是没必要的。
 
-还有更多的坐标系统，这些坐标系统对于定义各种投影相机类很有用：
+如图5.2所示，还有三种坐标系，这些坐标系对于定义各种投影相机的类是很有用的：
 
-- 屏幕空间： 在胶片平面上定义，相机在相机空间中把物体投影到了胶片平面上，在屏幕窗口中，生成图像的一部分会被看到。近平面上的点对应的z深度是0，远平面上的点对应z深度就是1。注意，虽然其被称为"屏幕"空间，但是还是一个3维的坐标系统，因为z值还是有意义的
-- 标准化设备坐标(NDC)空间: 被渲染的图像真正的坐标系统，在x和y，范围从坐上到右下，(0,0)到(1,1)，深度值与屏幕空间一样，可通过线性变换把屏幕空间转换为NDC空间
-- 光栅空间：与NDC空间几乎相同，除了x和y是从(0,0)到图像分辨率下的x,y值
+- 屏幕空间： 屏幕空间是在胶片平面上定义的，相机在相机空间中把物体投影到胶片平面上，在屏幕窗口中的物体的那部分，会在生成的图像中可见。在近平面上的点会被映射到深度z为0的面上，远平面上的点映射到的深度z值就是1。注意，虽然其被称为"屏幕"空间，但还是一个3维坐标系，因为z值是有意义的
+- 归一化的设备坐标(NDC)空间: 被渲染的图像真正的坐标系，对于x和y，范围从左上到右下，(0,0)到(1,1)，深度值与在屏幕空间中的值相同，可通过某种线性变换把屏幕空间转换为NDC空间
+- 光栅空间：与NDC空间几乎相同，除了x和y是从(0,0)到图像分辨率下的x,y像素数
 
-这三种空间和近远平面的关系如下:
+投影相机使用$4 \times 4$矩阵，来在上述空间之间做变换
 
 ![图5.2](img/fg5_2.png)
-图5.2 一些camera相关的类的坐标空间一般用于简化camera的实现。camera类持有这些空间之间的转换方法。在渲染空间下的场景中的物体会被相机观察到，相机坐落于相机空间的原点，指向+z方向。在近平面和远平面之间的物体，会被投影到胶片平面，胶片平面就是相机空间中的近平面。胶片平面在光栅平面就是z=0的地方，x，y的值就是图片分辨率的x,y值。NDC空间归一化了光栅空间，所以x,y值在(0,0)到(1,1)
 
-除了CameraBase类需要的参数外，ProjectiveCamera也需拿到投影变换矩阵参数，屏幕空间的范围就是图像的范围，还有焦距参数和透镜光圈大小的参数。如果光圈不是一个无穷小的孔，那么图像中的一部分可能会模糊(在真实的透镜系统中，聚焦范围外的物体会模糊)。这种效果的模拟会在后面的章节详述
+图5.2 为了简化相机类的实现，有几种相机相关的坐标空间被普遍使用。camera类持有这些空间之间的转换方法。在渲染空间下的场景中的物体会被相机观察到，这些物体在以相机控件的原点，指向+z轴方向上。在近平面和远平面之间的物体，会被投影到胶片平面，胶片平面即在相机空间中z=near的平面。胶片平面在光栅空间中就是z=0的面，在光栅空间中，x，y的范围就是图片分辨率的x,y像素数。NDC空间归一化了光栅空间，所以x,y值在(0,0)到(1,1)之间
+
+除了CameraBase类需要的参数外，ProjectiveCamera也需拿到投影变换矩阵、图像在屏幕空间的范围、焦距、和透镜光圈大小的参数。如果光圈不是一个无穷小的孔，那么图像中的一部分可能会变得模糊(在真实的透镜系统中，聚焦范围外的物体会模糊)。这种效果的模拟会在后面的章节详述
+
+<<ProjectiveCamera的public方法>>
 
 ```c++
-/*
-    投影相机： 从3d场景转换到2d图像的抽象，继承有正交和透视投影相机
-*/
-class ProjectiveCamera : public CameraBase {
-  public:
-    // ProjectiveCamera Public Methods
-    ProjectiveCamera() = default;
-    void InitMetadata(ImageMetadata *metadata) const;
+ProjectiveCamera(CameraBaseParameters baseParameters,
+        const Transform &screenFromCamera, Bounds2f screenWindow,
+        Float lensRadius, Float focalDistance)
+    : CameraBase(baseParameters), screenFromCamera(screenFromCamera),
+      lensRadius(lensRadius), focalDistance(focalDistance) {
+    <<计算投影相机的变换矩阵>> 
+}
+```
 
-    std::string BaseToString() const;
+ProjectiveCamera的实现类，会把从相机到屏幕的投影矩阵传到此处这个基类的构造器中，因此，这个构造器能轻松的计算光栅空间到相机空间过程中的其他所有变换
 
-    /*
-        除了CameraBase类需要的参数外，ProjectiveCamera也需拿到投影变换矩阵参数，
-        屏幕空间的范围就是图像的范围，还有焦距参数和透镜光圈大小的参数。
-        如果光圈不是一个无穷小的孔，那么图像中的一部分可能会模糊(在真实的透镜系统中，
-        聚焦范围外的物体会模糊)
+<<计算投影相机的变换矩阵>>
 
-        ProjectiveCamera的继承类会把投影变换传到基类的构造器中，提供了相机到屏幕
-        空间的投影转换。因此，构造器能更方便的从光栅空间转换到相机空间
-    */
-    ProjectiveCamera(CameraBaseParameters baseParameters,
-                     const Transform &screenFromCamera, Bounds2f screenWindow,
-                     Float lensRadius, Float focalDistance)
-        : CameraBase(baseParameters),
-          screenFromCamera(screenFromCamera),
-          lensRadius(lensRadius),
-          focalDistance(focalDistance) {
-        // Compute projective camera transformations
-        // Compute projective camera screen transformations
-        /*
-            从屏幕空间转换到光栅空间，注意y轴是反过来的
-        */
-        Transform NDCFromScreen =
-            Scale(1 / (screenWindow.pMax.x - screenWindow.pMin.x),
-                  1 / (screenWindow.pMax.y - screenWindow.pMin.y), 1) *
-            Translate(Vector3f(-screenWindow.pMin.x, -screenWindow.pMax.y, 0));
-        Transform rasterFromNDC =
-            Scale(film.FullResolution().x, -film.FullResolution().y, 1);
-        rasterFromScreen = rasterFromNDC * NDCFromScreen;
-        screenFromRaster = Inverse(rasterFromScreen);
+<<计算投影相机的屏幕变换矩阵>>
 
-        cameraFromRaster = Inverse(screenFromCamera) * screenFromRaster;
-    }
+```c++
+cameraFromRaster = Inverse(screenFromCamera) * screenFromRaster;
+```
 
-  protected:
-    // ProjectiveCamera Protected Members
-    Transform screenFromCamera, cameraFromRaster;
-    Transform rasterFromScreen, screenFromRaster;
-    Float lensRadius, focalDistance;
-};
+<<ProjectiveCamera的protected成员>>
+
+```c++
+Transform screenFromCamera, cameraFromRaster;
+```
+
+唯一在构造器中值得注意的变换是从屏幕到光栅的投影变换，它是通过组合NDC到光栅和从屏幕到NDC变换，2个步骤计算出来的。一个重要的细节是，y坐标会被最终转换所反转，这是必要的，因为在屏幕坐标中，y增加是在图像中上移，但是在光栅坐标中是下移
+
+<<计算投影相机的屏幕(空间)转换>>
+
+```c++
+Transform NDCFromScreen =
+    Scale(1 / (screenWindow.pMax.x - screenWindow.pMin.x),
+          1 / (screenWindow.pMax.y - screenWindow.pMin.y), 1) *
+    Translate(Vector3f(-screenWindow.pMin.x, -screenWindow.pMax.y, 0));
+Transform rasterFromNDC =
+    Scale(film.FullResolution().x, -film.FullResolution().y, 1);
+rasterFromScreen = rasterFromNDC * NDCFromScreen;
+screenFromRaster = Inverse(rasterFromScreen);
+```
+
+<<ProjectiveCamera的protected成员>>
+
+```c++
+Transform rasterFromScreen, screenFromRaster;
 ```
 
 ### 5.2.1 正交投影相机
@@ -365,13 +360,13 @@ class ProjectiveCamera : public CameraBase {
 ```c++
 class PerspectiveCamera : public ProjectiveCamera {
   public:
-    <<PerspectiveCamera Public Methods>> 
+    <<PerspectiveCamera的Public方法>> 
   private:
-    <<PerspectiveCamera Private Members>> 
+    <<PerspectiveCamera的Private成员>> 
 };
 ```
 
-<<PerspectiveCamera Public Methods>>
+<<PerspectiveCamera的Public方法>>
 
 ```c++
 PerspectiveCamera(CameraBaseParameters baseParameters, Float fov,
@@ -389,14 +384,14 @@ PerspectiveCamera(CameraBaseParameters baseParameters, Float fov,
 
 ![图5.6](img/fg5_6.png)
 
-图5.6 透视变换矩阵把相机空间中的点投影到近平面上。投影后的坐标x'和y'相当于被z坐标分割后的投影前的x,y坐标。上图中，用箭头表示了投影的效果。投影后的z'之后会计算出来，这样后近平面上一点会映射到z'=0,远平面一点会映射到z'=1
+图5.6 透视变换矩阵把相机空间中的点投影到近平面上。投影后的坐标x'和y'等于投影前x,y坐标除以z坐标。上图中，用箭头表示了投影的效果。投影后的z'之后会计算出来，那么近平面上一点会映射到z'=0的面上,远平面一点会映射到z'=1的面上
 
 <<变换函数的定义>>
 
 ```c++
 Transform Perspective(Float fov, Float n, Float f) {
-    <<为透视投影执行投影除法>> 
-    <<把正则透视图缩放到对应视场角上>> 
+    <<为透视投影执行投影的除法>> 
+    <<把正则透视的视野缩放到这个fov>> 
 }
 ```
 
@@ -427,7 +422,7 @@ $$
 >
 > $-\frac{fn}{f-n}$表示从z坐标的透视投影偏移
 
-<<为透视投影执行投影除法>>
+<<为透视投影执行投影的除法>>
 
 ```c++
 SquareMatrix<4> persp(1, 0,           0,              0,
@@ -438,7 +433,7 @@ SquareMatrix<4> persp(1, 0,           0,              0,
 
 2. 用户指定的视场角（fov）会通过缩放投影平面上的(x,y)的值来考虑，从而确保视场内的点投影到视平面上的坐标在[-1,1]的范围内。对于方形图像来说，x和y都落在屏幕空间的[-1,1]之间。否则，更窄方向上的图像映射到[-1,1]，更宽的方向上映射到等比例更大的屏幕空间值范围中。回想一下，正切是等于直角三角形的对边与邻边的比值。在此处邻边边长是1，故对边边长为$\tan(fov/2)$。用这个长度的倒数来缩放是把fov映射到[-1,1]上。
 
-<<把正则透视图缩放到对应视场角上>> 
+<<把正则透视的视野缩放到这个fov>>
 
 ```c++
 Float invTanAng = 1 / std::tan(Radians(fov) / 2);
@@ -462,7 +457,7 @@ dyCamera = cameraFromRaster(Point3f(0, 1, 0)) -
 Vector3f dxCamera, dyCamera;
 ```
 
-透视相机的fov最大角的余弦值有时候会很有用。尤其是在fov外的点可以用观察方向点乘的值与这个值来比较，进行快速剔除。余弦值可以通过相机的观察向量和图像某个角落的向量来计算出来(见图5.7)。这个角落的位置需做微小的调整(因为要考虑以每个像素为中心的滤光片函数的宽度，这个宽度是用来根据它们的位置来做采样的权重值(详见章节8.8))
+透视相机的fov最大角的余弦值有时候会很有用。尤其是在fov外的物体做快速剔除，可以用观察方向向量来与此值点乘，再与这个值比较来达成。余弦值可以通过相机的观察向量和图像某个角落的向量来计算出来(见图5.7)。这个角落的位置需做微小的调整(因为要考虑以每个像素为中心的滤波器函数的宽度，这个宽度是用来根据它们的位置来做采样的权重值(详见章节8.8))
 
 ![图5.7](img/fg5_7.png)
 
@@ -483,7 +478,34 @@ cosTotalWidth = wCornerCamera.z;
 Float cosTotalWidth;
 ```
 
-运用了透视投影后，相机空间的光线都从(0,0,0)的原点出发。一个光线的方向是由原点到近平面的点的向量给出。
+运用了透视投影后，相机空间的光线都从(0,0,0)的原点出发。一个光线的方向是由原点到近平面的点的向量给出。pCamera对应入参的CameraSample对象的pFilm的位置。换句话说，光线的向量方向的每个分量都相应等于这个点的位置量，所以，为了计算方向而做减法是没用的，我们直接用pCamera来初始化方向即可。
+
+<<PerspectiveCamera的方法定义>>
+
+```c++
+pstd::optional<CameraRay> PerspectiveCamera::GenerateRay(
+        CameraSample sample, SampledWavelengths &lambda) const {
+    <<计算光栅量和相机样本的位置>> 
+    Ray ray(Point3f(0, 0, 0), Normalize(Vector3f(pCamera)),
+            SampleTime(sample.time), medium);
+    <<为了景深效果而修改光线>> 
+    return CameraRay{RenderFromCamera(ray)};
+}
+```
+
+GenerateRayDifferential()也遵从了GenerateRay()的实现，除了下方这个额外的代码片段，此片段计算光线的微分量
+
+<<为PerspectiveCamera的光线微分量计算偏移光线>>
+
+```c++
+if (lensRadius > 0) {
+    <<在考虑镜头效果的情况下计算PerspectiveCamera的光线微分量>> 
+} else {
+    ray.rxOrigin = ray.ryOrigin = ray.o;
+    ray.rxDirection = Normalize(Vector3f(pCamera) + dxCamera);
+    ray.ryDirection = Normalize(Vector3f(pCamera) + dyCamera);
+}
+```
 
 ### 5.2.3 薄透镜模型和景深
 

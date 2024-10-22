@@ -41,3 +41,31 @@
     - 把着色器绑定到program上（这个program就是自定义的着色器包含在一起的一个地方）
     - 链接着色器（检查program里的着色器是否能对应得上）
     - 使用这个program
+  
+### shader的调试
+
+1. 早年: 用Nvidia Nsight
+   - 需要多个GPU来调试GLSL
+   - 在HLSL上必须用软件模拟来运行
+2. 用Nishgt Graphics(只支持Nvidia)，或RenderDoc(跨平台)
+3. 闫调试法：把要输出的值以颜色的值打印出来，用像素点颜色去debug
+
+### 渲染方程
+
+$$
+L_o(p,\omega_o) = L_e(p, \omega_o) + \int_{H^2}f_r(p,\omega_i \rightarrow \omega_o)L_i(p, \omega_i)\cos \theta_i d\omega_i
+$$
+
+RTR中的渲染方程:
+
+$$
+L_o(p,\omega_o) = \int_{\Omega^+}L_i(p, \omega_i)f_r(p,\omega_i,\omega_o)\cos \theta_i V(p, \omega_i)d\omega_i
+$$
+
+> V函数代表可见性, $L_i$和$f_r$对调这里是代表这个BRDF是被$\cos$加权的
+>
+> $\Omega^+$代表朝外与法线同侧的半球面
+
+### 全局光照问题
+
+通常就是多bounce一次，因为后续再加bounce数不如从0到1的变化大

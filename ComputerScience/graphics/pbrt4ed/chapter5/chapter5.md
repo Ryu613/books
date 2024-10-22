@@ -21,13 +21,8 @@ class Camera : public TaggedPointer<PerspectiveCamera,OrthographicCamera,
 
     /*
         必须实现的方法，用于对应图像采样的光线的计算，返回的光线需要归一化
-        若给定的CameraSample对象由于一些原因没有有效的光线，那么pstd::optional
-        中的返回值需要被重置。
-
-        传入进来的SampleWavelengths(样本波长)不是常量引用，故相机就可以模拟镜头
-        的色散效果，在这种情况下，光线只追踪单一波长的光，并且 GenerateRay() 
-        方法将调用 SampledWavelengths::TerminateSecondary()
-
+        若给定的CameraSample对象由于一些原因没有有效的光线，那么pstd::optional中的返回值需要被重置。
+        传入进来的SampleWavelengths(采样波长)不是常量引用，故相机就可以模拟镜头的色散效果，在这种情况下，光线只追踪单一波长的光，并且 GenerateRay() 方法将调用 SampledWavelengths::TerminateSecondar()
         传入到此函数的CameraSample结构体，包含了相机光线需要的所有样本值。
     */
     PBRT_CPU_GPU inline pstd::optional<CameraRay> GenerateRay(
@@ -363,7 +358,132 @@ class ProjectiveCamera : public CameraBase {
 
 ### 5.2.2 透视投影相机
 
-与正交投影相似的是透视投影相机也会把长方体空间投影到二维胶片的面上，但是，会有近大远小效果。物体投影后会产生形状变化，这种方式与人眼和相机镜头的原理相似。
+与正交投影相似的是透视投影相机也会把长方体空间投影到二维胶片的面上，但是，会有近大远小效果。物体投影后会产生形状变化，这种方式与人眼和相机镜头的原理相似。不像正交投影，透视投影不会保持距离和角不变，并且平行线也不会一直平行。
+
+<<PerspectiveCamera的定义>>
+
+```c++
+class PerspectiveCamera : public ProjectiveCamera {
+  public:
+    <<PerspectiveCamera Public Methods>> 
+  private:
+    <<PerspectiveCamera Private Members>> 
+};
+```
+
+<<PerspectiveCamera Public Methods>>
+
+```c++
+PerspectiveCamera(CameraBaseParameters baseParameters, Float fov,
+                  Bounds2f screenWindow, Float lensRadius, Float focalDist)
+    : ProjectiveCamera(baseParameters, Perspective(fov, 1e-2f, 1000.f),
+                       screenWindow, lensRadius, focalDist) {
+    <<为透视相机的光线计算原点位置的微分变化量>> 
+    <<为透视相机计算cosTotalWidth>> 
+    <<为透视相机计算z=1时的图像平面区域>> 
+    <<为透视相机计算最小的微分量>> 
+}
+```
+
+透视投影描述了场景的透视观察效果。场景中的一点会投影在垂直于z轴的观察平面上。Perspective()函数计算这个变换。这个函数取视场角fov,和近平面和远平面
+
+![图5.6](img/fg5_6.png)
+
+图5.6 透视变换矩阵把相机空间中的点投影到近平面上。投影后的坐标x'和y'相当于被z坐标分割后的投影前的x,y坐标。上图中，用箭头表示了投影的效果。投影后的z'之后会计算出来，这样后近平面上一点会映射到z'=0,远平面一点会映射到z'=1
+
+<<变换函数的定义>>
+
+```c++
+Transform Perspective(Float fov, Float n, Float f) {
+    <<为透视投影执行投影除法>> 
+    <<把正则透视图缩放到对应视场角上>> 
+}
+```
+
+变换过程非常简单，如下两步:
+
+1. 相机空间中的点p投影到观察平面上。下方这些代数式表示了投影后的x',y'在观察面上能以被z除x,和y的方式来计算出来。投影后的z已被重新映射了，所以z的值在近平面上是0，远平面上是1.相关的计算如下:
+
+$$
+x'=x/z\\
+y'=y/z\\
+z'=\frac{f(z-n)}{z(f-n)}
+$$
+
+> f: 相机焦距， n: 相机的近裁剪面
+
+所有的这些计算可以用$4 \times 4$的矩阵编码，这个矩阵可以用在齐次坐标上。
+
+$$
+\begin{bmatrix}
+1 & 0 & 0 & 0\\
+0 & 1 & 0 & 0\\
+0 & 0 & {\frac{f}{f-n}} & {-\frac{fn}{f-n}}\\
+0 & 0 & 1 & 0\\
+\end{bmatrix}
+$$
+
+> $\frac{f}{f-n}$表示对z坐标的缩放
+>
+> $-\frac{fn}{f-n}$表示从z坐标的透视投影偏移
+
+<<为透视投影执行投影除法>>
+
+```c++
+SquareMatrix<4> persp(1, 0,           0,              0,
+                      0, 1,           0,              0,
+                      0, 0, f / (f - n), -f*n / (f - n),
+                      0, 0,           1,              0);
+```
+
+2. 用户指定的视场角（fov）会通过缩放投影平面上的(x,y)的值来考虑，从而确保视场内的点投影到视平面上的坐标在[-1,1]的范围内。对于方形图像来说，x和y都落在屏幕空间的[-1,1]之间。否则，更窄方向上的图像映射到[-1,1]，更宽的方向上映射到等比例更大的屏幕空间值范围中。回想一下，正切是等于直角三角形的对边与邻边的比值。在此处邻边边长是1，故对边边长为$\tan(fov/2)$。用这个长度的倒数来缩放是把fov映射到[-1,1]上。
+
+<<把正则透视图缩放到对应视场角上>> 
+
+```c++
+Float invTanAng = 1 / std::tan(Radians(fov) / 2);
+return Scale(invTanAng, invTanAng, 1) * Transform(persp);
+```
+
+如同OrthographicCamera那样，投影相机的构造器计算相机生成的光线在像素点上的偏移量的信息。在这种场景下，光线的原点是不变的，并且光线的微分量只在方向上不同。在此处，我们计算相应像素点位置在相机空间上的近投影面位置的改变量。
+
+<<为透视相机的光线计算原点位置的微分变化量>>
+
+```c++
+dxCamera = cameraFromRaster(Point3f(1, 0, 0)) -
+           cameraFromRaster(Point3f(0, 0, 0));
+dyCamera = cameraFromRaster(Point3f(0, 1, 0)) -
+           cameraFromRaster(Point3f(0, 0, 0));
+```
+
+<<PerspectiveCamera的Private成员>>
+
+```c++
+Vector3f dxCamera, dyCamera;
+```
+
+透视相机的fov最大角的余弦值有时候会很有用。尤其是在fov外的点可以用观察方向点乘的值与这个值来比较，进行快速剔除。余弦值可以通过相机的观察向量和图像某个角落的向量来计算出来(见图5.7)。这个角落的位置需做微小的调整(因为要考虑以每个像素为中心的滤光片函数的宽度，这个宽度是用来根据它们的位置来做采样的权重值(详见章节8.8))
+
+![图5.7](img/fg5_7.png)
+
+图5.7 计算透视相机的最大观察角的余弦值。代表了PerspectiveCamera在观察方向上的边界的一个锥体，可以用相机的观察方向作为中心轴，计算这个轴与图像角落某点的夹角$\theta$的余弦来找到。在相机空间中，这个余弦值简化为该向量经过归一化的z分量值
+
+<<为透视相机计算cosTotalWidth>>
+
+```c++
+Point2f radius = Point2f(film.GetFilter().Radius());
+Point3f pCorner(-radius.x, -radius.y, 0.f);
+Vector3f wCornerCamera = Normalize(Vector3f(cameraFromRaster(pCorner)));
+cosTotalWidth = wCornerCamera.z;
+```
+
+<<PerspectiveCamera的Private成员>>
+
+```c++
+Float cosTotalWidth;
+```
+
+运用了透视投影后，相机空间的光线都从(0,0,0)的原点出发。一个光线的方向是由原点到近平面的点的向量给出。
 
 ### 5.2.3 薄透镜模型和景深
 
@@ -474,7 +594,7 @@ PixelSensor对感光器的像素色彩度量进行了半理想化的建模:
    来模拟人类视觉系统中的色彩适应过程。因此，捕获的图像在视觉上看起来与
    人类观察者在拍照时记忆中的图像相似
 
-pbrt包含了一个真实感相机模型，也是基于投影矩阵的理想模型。因为真空详见有一个无限小的光圈。我们在PixelSensor的是线上做了程序上的折衷，这样的话用针孔模型渲染的图像就不是完全黑的。我们留下了Camera的响应作用，用来对光圈尺寸效应的建模。理想化的模型不会考虑此，尽管RealisticCamera在<<为RealisticCamera光线计算权重>>里确实这样做了。PixelSensor之后只会考虑快门时间和ISO的设置。这两个因素被包含在一个量里，叫做成像比(imaging ratio)。
+pbrt包含了一个真实感相机模型，也是基于投影矩阵的理想模型。因为针孔相机有一个无限小的光圈。我们在PixelSensor在实现上做了程序上的折衷，这样的话用针孔模型渲染的图像就不是完全黑的。我们留下了Camera的响应作用，用来对光圈尺寸效应的建模。理想化的模型不会考虑此，尽管RealisticCamera在<<为RealisticCamera光线计算权重>>里确实这样做了。PixelSensor之后只会考虑快门时间和ISO的设置。这两个因素被包含在一个量里，叫做成像比(imaging ratio)。
 
 PixelSensor构造器取感光器的RGB匹配函数-$\bar{r},\bar{g}$和$\bar{b}$, 把成像比作为参数。同时，它也会根据用于要求输出的RGB值来取颜色空间，也会取光照的光谱，这个光谱定义了场景中什么颜色是白色。把这些参数合在一起，就能够在感光器的测量下，把光谱能量转换为RGB，然后输出为颜色空间中的RGB。
 
@@ -519,9 +639,12 @@ $$
 
 同时，只要有超过三种反射率值，问题就会成为一个超定问题，可以通过线性最小二乘法来求解。
 
-<<从相机RGB矩阵计算XYZ>> 
+<<从相机RGB矩阵计算XYZ>>
+
 <<计算用于训练的色块的相机RGB值>>
+
 <<为用于训练的色块计算xyzOutput值>>
+
 <<利用线性最小二乘法来初始化XYZFromSensorRGB>>
 
 给定感光器的光照量，为每个被ProjectReflectance()处理的反射率计算RGB的相关系数

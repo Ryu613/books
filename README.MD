@@ -4,11 +4,11 @@
 
 皆为本人精选书籍，以专业书籍为主，科普书籍为辅
 
-包括但不限于书籍，以先出笔记后出文章的方式进行学习
+包括但不限于书籍，也可能是资料(如在线课程或文章等)，以先出笔记后出文章的方式进行学习
 
 一生更新
 
-**github对markdown的预览支持不太好，推荐下载后用markdown阅读器观看**
+> **github对markdown的预览支持不太好，推荐下载后用markdown阅读器观看**
 
 ## 笔记
 
@@ -18,7 +18,7 @@
 
 目前pbrt-v4更新中
 
-#### 1.2 [C++](ComputerScience/C++/readme.md)
+#### 1.2 [编程语言](ComputerScience/ProgrammingLanguage/readme.md)
 
 迁移和重整理旧版内容中
 
@@ -50,7 +50,7 @@
 
 待整理
 
-### 8. [人文学科](Humanities/readmme.md)
+### 8. [人文学科](Humanities/readme.md)
 
 待整理
 

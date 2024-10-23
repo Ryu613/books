@@ -4,7 +4,7 @@
 
 ## [神经科学：探索脑](神经科学-探索脑.md)
 
-## [思考 快与慢](思考,快与慢.md)
+## [思考 快与慢](思考，快与慢.md)
 
 ## Theoretical Neuroscience: Computational and Mathematical Modeling of Neural Systems
 

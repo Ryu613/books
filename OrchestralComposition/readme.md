@@ -4,7 +4,7 @@
 
 ## 乐理
 
-### The.Complete.Idiot's.Guide.To.Music.Theory 2ed
+### [The Complete Idiot's Guide To Music Theory 2ed](TheCompleteIdiotsGuideToMusicTheory2ed/contents.md)
 
 ## 和声
 

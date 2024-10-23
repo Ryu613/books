@@ -16,7 +16,7 @@
 
 #### 1.1 [图形学](ComputerScience/graphics/readme.md)
 
-目前pbrt-v4更新中
+目前pbrt-v4, GAMES202更新中
 
 #### 1.2 [编程语言](ComputerScience/ProgrammingLanguage/readme.md)
 

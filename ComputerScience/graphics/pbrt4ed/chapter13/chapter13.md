@@ -143,13 +143,13 @@ $$
 
 然而，用这种方式写出的LTE还不太够。为了把LTE从对方向的积分转为对面上的积分，我们也需要乘上立体角的雅可比式子，这个式子是$\frac{|\cos \theta'|}{r^2}$
 
-把这个变化后的式子结合起来，原来的$|\cos \theta|$是来自LTE，双向的可见性函数V(V=1时两点互相可见，否则V=0)，这个单一的几何耦合项函数$G(p \leftrightarrow p')$为:
+把这个变化后的式子结合起来，原来的$\vert \cos \theta\vert$是来自LTE，双向的可见性函数V(V=1时两点互相可见，否则V=0)，这个单一的几何耦合项函数$G(p \leftrightarrow p')$为:
 
 $$
 G(p \leftrightarrow p') = V(p \leftrightarrow p')\frac{|\cos \theta||\cos \theta'|}{||p-p'||^2}
 $$
 
-> 这个式子描述了p到p'的变化关系，若两点互相可见，则把LTE里的余弦量带过来，在乘以雅可比量(用于把方向积分转为面积分)，定义这个G是用于替换掉LTE里$|\cos \theta|d\omega$的部分
+> 这个式子描述了p到p'的变化关系，若两点互相可见，则把LTE里的余弦量带过来，在乘以雅可比量(用于把方向积分转为面积分)，定义这个G是用于替换掉LTE里$\vert \cos \theta|d\omega$的部分
 
 把这些式子代入到LTE，然后把其转换为面上的积分，我们可以得到LTE的三点形式公式:
 

@@ -202,7 +202,7 @@ $$
 E(p,\vec{n})=\int_{\Omega}L_i(p, \omega)|\cos \theta|d\omega
 $$
 
-其中$L_i(p,\omega)$是入射辐射函数,$|\cos \theta|d\omega$是为了对应$dA^{\bot}$在立体角$\omega$上的面积微元(取绝对值是防止跑到表面内)。$\theta$是$\omega$和法线$\vec{n}$的夹角。辐照度一般是在沿着$\vec{n}$上的$H^2(\vec{n})$的半球体方向上进行积分计算
+其中$L_i(p,\omega)$是入射辐射函数,$\vert \cos \theta|d\omega$是为了对应$dA^{\bot}$在立体角$\omega$上的面积微元(取绝对值是防止跑到表面内)。$\theta$是$\omega$和法线$\vec{n}$的夹角。辐照度一般是在沿着$\vec{n}$上的$H^2(\vec{n})$的半球体方向上进行积分计算
 
 辐照度一般看作是在半球面上积分
 

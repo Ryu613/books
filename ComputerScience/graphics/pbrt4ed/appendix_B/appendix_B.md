@@ -1,5 +1,130 @@
 # 附录B 工具
 
+## B.2 数学基础工具
+
+### B.2.14 伪随机数生成器
+
+pbrt使用了一种PCG伪随机数生成器的实现方法，来生成伪随机数。这个生成器不仅通过了各种随机性的严谨的数据测试，而且在实现上也极度高效
+
+我们把它的实现封装到了一个很小的随机数字生成器的类中，叫RNG,位置在util/rng.h和util/rng/cpp。随机数生成器的实现是一门深奥的艺术。我们不会在此讨论，只会介绍提供的接口
+
+```c++
+<<RNG Definition>>= 
+class RNG {
+  public:
+    <<RNG Public Methods>> 
+  private:
+    <<RNG Private Members>> 
+};
+```
+
+RNG类提供了3个构造器，第一个是无参的，会把内置状态设置为合理的默认值。其他的构造器允许提供值来初始化它们的状态。PCG随机数生成器实际上允许用户提供2个64位的值，来对这个类的操作进行配置：第一个参数是从$2^{64}$个随机数中的$2^{63}$个序列中，选取一个不同的序列，第二个参数是在这个序列中选择一个起始点。很多伪随机数生成器只允许第二种形式的配置，只有这个形式是不够实用的，拥有独立不重叠的值的序列，比起在单个序列中使用不同起始点，在生成的值上提供了更好的非均匀性。
+
+```c++
+<<RNG Public Methods>>= 
+RNG() : state(PCG32_DEFAULT_STATE), inc(PCG32_DEFAULT_STREAM) {}
+RNG(uint64_t seqIndex, uint64_t offset) { SetSequence(seqIndex, offset); }
+RNG(uint64_t seqIndex) { SetSequence(seqIndex); }
+```
+
+在pbrt中，若没通过构造器或调用SetSequence()方法来提供初始序列索引，就不应被使用。否则系统中不同部分可能会无意中使用了具有相关性的伪随机数值，这可能导致预料之外的误差。
+
+```c++
+void SetSequence(uint64_t sequenceIndex, uint64_t offset);
+void SetSequence(uint64_t sequenceIndex) {
+    SetSequence(sequenceIndex, MixBits(sequenceIndex));
+}
+```
+
+RNG类定义了一个模板方法Uniform(),这个方法返回一个特定类型的均匀分布随机数。基础的算术类型都有此方法的特制版
+
+```c++
+<<RNG Public Methods>>
+template <typename T>
+T Uniform();
+```
+
+Uniform()默认的实现试图保证若用一个不支持的类型执行时，提示一个有用的错误信息
+
+```c++
+<<RNG Inline Method Definitions>>
+template <typename T>
+T RNG::Uniform() { return T::unimplemented; }
+```
+
+为uint32_t特制的版本使用了PCG算法来生成一个32位的值。我们在此不会包含此实现，因为不展开讨论伪随机数生成器的实现方法是讲不透的。
+
+```c++
+<<RNG Inline Method Definitions>>
+template <>
+uint32_t RNG::Uniform<uint32_t>();
+```
+
+给出了一个伪随机性的源头，那么各种其他特制的Uniform()就可以被提供出来了。比如，一个均匀的64位无符号整数可以用两个32位随机数来生成
+
+```c++
+<<RNG Inline Method Definitions>>
+template <>
+uint64_t RNG::Uniform<uint64_t>() {
+    uint64_t v0 = Uniform<uint32_t>(), v1 = Uniform<uint32_t>();
+    return (v0 << 32) | v1;
+}
+```
+
+生成一个均匀分布的32位带符号的整数需要格外刁钻的代码。这个问题在于C++，把某个比能表示的有符号整数更大的值赋给有符号整数的行为是未定义的。未定义的行为不单意味着结果未定义，还意味着，理论上，当这种情况发生后，程序执行的正确性也没法保障。因此，下列的代码是被精心编写的，用来避免整形溢出问题。现实中，一款良好的编译器可以期望它能优化掉这些多余的工作
+
+```c++
+<<RNG Inline Method Definitions>>+=  
+template <>
+int32_t RNG::Uniform<int32_t>() {
+    uint32_t v = Uniform<uint32_t>();
+    if (v <= (uint32_t)std::numeric_limits<int32_t>::max())
+        return int32_t(v);
+    return int32_t(v - std::numeric_limits<int32_t>::min()) +
+           std::numeric_limits<int32_t>::min();
+}
+```
+
+返回int64_t值的伪随机方法也类似
+
+给定一个边界b，生成一个在[0,b-1]上均匀分布的值是很常用的。为了做到此功能，pbrt的前两个版本用Uniform<int32_t>() % b有效的计算出来。当b不能整除$2^{32}$时，这个方式是有瑕疵的，这会导致在子域$[0, 2^{32} mod\ b - 1]$，有更高的可能性取出一个值。
+
+因此，这里的实现首先用32位算数高效地计算了上式$2^{32} mod\ b$的余数，然后保存到threshold变量中。之后，若被Uniform()返回的值小于threshold,就会被丢弃，然后会生成一个新的数，在取模操作后，值得分布结果就是均匀的，也就可以给出一个均匀分布的样本值
+
+这个刁钻的返回值声明保证了Uniform()的变量只在整形时才可用
+
+```c++
+<<RNG Public Methods>>
+template <typename T>
+typename std::enable_if_t<std::is_integral_v<T>, T> Uniform(T b) {
+    T threshold = (~b + 1u) % b;
+    while (true) {
+        T r = Uniform<T>();
+        if (r >= threshold)
+            return r % b;
+    }
+}
+```
+
+浮点数特制的Uniform()方法生成一个伪随机浮点数，区间在[0,1), 方法是用32位的随机数乘上$2^{-32}$。然而，当使用浮点算数计算时，还是由一些值会约到1,这种情况通过把其夹拢到小于1的最大可表示浮点数内处理。这么做会引入微小的偏差，但是对于渲染程序来说，是不足以有意义的。
+
+```c++
+<<RNG Inline Method Definitions>>+= 
+template <>
+float RNG::Uniform<float>() {
+    return std::min<float>(OneMinusEpsilon, Uniform<uint32_t>() * 0x1p-32f);
+}
+```
+
+对于double有个等效的方法，在此不赘述
+
+有了这个随机数生成器，不需要生成所有中间值，就可以在序列中往前或往后取到不同的点。Advance()方法提供了这个功能
+
+```c++
+<<RNG Public Methods>>
+void Advance(int64_t idelta);
+```
+
 ## B.4 容器和内存管理
 
 ### B.4.4 标签化的指针

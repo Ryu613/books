@@ -10,7 +10,7 @@
 >
 > pbrt代码本人注解版(fork自原始代码): [pbrt-v4-digest-cn](https://github.com/Ryu613/pbrt-v4-digest-cn)
 
-目前第一遍进行中，自学用
+目前第一遍进行中，还不适宜参考
 
 ## [第一章 绪论](chapter1/chapter1.md)
 
@@ -40,6 +40,8 @@
 > **重点章节**
 > 相机，胶片，感光器理论及实现
 
+[第五章重点总结](chapter5/ch5_summary.md)
+
 ## [第六章 形状](chapter6/chapter6.md)
 
 > 形状的几何信息部分的设计与实现
@@ -48,7 +50,7 @@
 
 > 几何形状的材质信息部分的抽象与实现
 
-## [第八章 采样和重建](chapter8/chapter8.md)
+## [第八章 采样与重建](chapter8/chapter8.md)
 
 > 采样算法和实现，滤波器的原理和实现
 

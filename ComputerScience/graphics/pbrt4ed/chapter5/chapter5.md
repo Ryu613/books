@@ -541,11 +541,6 @@ $$
 E(p)=\int_{A_e}L_i(p,p')\frac{\vert\cos \theta \cos \theta'\vert}{\|p'-p\|^2}dA_e
 $$
 
-> 推导过程是:
->
-> 1. 先用Radiance在球面积分, 得出irradiance
-> 2. 把立体角的积分转为对面积的积分
-
 图5.18展示了这种场景下的几何关系:
 
 ![图5.18](img/fg5_18.png)

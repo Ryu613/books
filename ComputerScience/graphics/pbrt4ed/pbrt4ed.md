@@ -10,7 +10,7 @@
 >
 > pbrt代码本人注解版(fork自原始代码): [pbrt-v4-digest-cn](https://github.com/Ryu613/pbrt-v4-digest-cn)
 
-目前第一遍进行中，还不适宜参考
+目前第一遍进行中，还不适宜读者参考
 
 ## [第一章 绪论](chapter1/chapter1.md)
 

@@ -43,7 +43,7 @@ $$
 
 以上两种情况下，满足一种，近似式更精确
 
-把渲染公式的V函数可以拿出去，变成:
+把渲染方程的V函数可以拿出去，变成:
 
 $$
 L_o(p,\omega_o) \approx \frac{\int_{\Omega^+}V(p, \omega_i)d\omega_i}{\int_{\Omega^+}d\omega_i} \int_{\Omega^+}L_i(p, \omega_i)f_r(p,\omega_i,\omega_o)\cos \theta_i d\omega_i

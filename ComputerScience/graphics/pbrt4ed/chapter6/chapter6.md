@@ -244,7 +244,7 @@ Point3f p() const { return Point3f(pi); }
 Float PDF(const ShapeSampleContext &ctx, Vector3f wi) const;
 ```
 
-一些PDF()的实现会需要从参考点跟踪一条在$\omega_i$方向上的光线，来观察此光线是否会与形状相交。下列的ShapeSampleContext方法应该被用来寻找原点，或者光线自身，而不是是用ShapeSampleContext::p()返回的点。源于在交点处理数值误差的细节，这些方法的实现和相关的问题可在章节6.8.6找到
+一些PDF()的实现会需要从参考点跟踪一条在$\omega_i$方向上的光线，来观察此光线是否会与形状相交。下列的ShapeSampleContext方法应该被用来寻找原点，或者光线自身，而不是用ShapeSampleContext::p()返回的点。源于在交点数值误差的处理细节，这些方法的实现和相关的问题可在章节6.8.6找到
 
 ```c++
 <<ShapeSampleContext Public Methods>>

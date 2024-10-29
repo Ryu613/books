@@ -253,10 +253,283 @@ Point3f OffsetRayOrigin(Point3f pt) const;
 Ray SpawnRay(Vector3f w) const;
 ```
 
-## 6.2 球体
+## 6.2 球面
+
+球面是一种特殊类型的面，称为二次曲面，这种面用x,y,z的二次多项式描述。为了介绍相交算法，以此类型的面作为起点是很不错的。结合变换矩阵，pbrt的球面形状也能够变为椭球的形式。pbrt也支持其他两种基本类型的二次曲面：圆柱面和圆盘面。其他二次曲面比如锥面，双曲面，和抛物面在大部分渲染应用中不太常用，故在本系统中没有包含在内。
+
+许多面可以用一种或两种方式描述：用隐函数形式或参数形式。描述一个三维面的隐函数是:
+
+$$
+f(x,y,z)=0
+$$
+
+所有满足此函数条件的点集(x,y,z)定义了此表面。对于圆心在原点的单位球面，我们熟悉的隐函数方程是$x^2+y^2+z^2-1=0$。只有离原点1个单位的点集满足这个约束条件，这些点给出了单位球的面。
+
+很多面也可以被参数化描述，参数化即利用一个函数，把表面上的2维的点映射成3维点。比如：半径为r的球面，可以用二维球坐标$(\theta, \phi)$函数来描述。其中$\theta$范围从0到$\pi$,$\phi$的范围从0到$2\pi$,如图6.3
+
+$$
+\begin{aligned}
+x=&r\sin\theta\cos\phi\\
+y=&r\sin\theta\sin\phi\\
+z=&r\cos\theta\\
+ \tag{6.1}
+\end{aligned}
+$$
+
+![图6.3](img/fg6_3.png)
+
+图6.3 球面的基本设置 此球半径r，圆心在物体空间的原点，球面的一部分可以通过定义一个最大$\phi$值来实现
+
+我们可以把函数$f(\theta,\phi)$变换为在$[0,1]^2$的函数$f(u,v)$，然后把此函数稍微推广到允许扫过$\theta\in[\theta_{min},\theta_{max}]$,和$\phi\in[0,\phi_{max}]$球面的一部分,用u,v替换如下:
+
+$$
+\begin{aligned}
+\phi=&u\phi_{max}\\
+\theta=&\theta_{min}+v(\theta_{max}-\theta_{min})\\
+ \tag{6.2}
+\end{aligned}
+$$
+
+这种式子对于纹理映射相当有用，此式可以直接把以$[0,1]^2$定义的纹理映射到球面上。图6.4展示了两个球面的图像，为了展示(u,v)的参数化，使用了一个网格式的贴图
+
+![图6.4](img/fg6_4.png)
+
+图6.4 **两个球面**，左侧是球面的一部分($z_{max}<r,\phi_{max}<2\pi$),右侧是完整的球面，注意，使用纹理图片展示形状的(u,v)参数化。在完整球面上可以看到其中一个极点
+
+既然我们描述了球面的实现，对于隐式或参数化这两种描述，我们会根据我们要解决的特定问题，看哪种方法更自然就利用哪种。
+
+Sphere类代表了一个球面，它的球心在原点，与其他形状类似，此类的实现在文件shapes.h和shapes.cpp中
+
+```c++
+<<Sphere Definition>>
+class Sphere {
+  public:
+    <<Sphere Public Methods>> 
+  private:
+    <<Sphere Private Members>> 
+};
+```
+
+就如前文所述，在pbrt中的球面的定义，在此物体的坐标系中，其圆心在原点。球面的构造器提供了在球面的物体空间和渲染空间之间的变换。
+
+虽然pbrt支持动画化的变换矩阵，但是在此的变换并不是animatedTransform类(本章中的其他形状类也如此)。动画化的性转变换是被另一个类:TransformedPrimitive来处理，用来代表场景中的这种形状。这样做可以让我们在单独一个地方对动画化的变换做一些特殊的细节操作，而不用处理所有形状。
+
+球面的半径可以是任意正值，球面的范围可用两种方式截断，第一种，设置最大最小的z值，这个球在z值外的面会被相应截断；第二种，在球坐标里考虑参数化，可以设置最大$\phi$值，球面从0到给定的$\phi_{max}$扫过，大于$\phi_{max}$的部分会被去除
+
+最后，球面的构造器也可以取一个布尔值:reverseOrientation,这个值代表了它们的表面法线方向是否应该从默认(指向球面外侧)反转过来。由于表面法线是用来代表哪个面是形状的"外面"，所以此参数很有用。此参数在pbrt的场景描述文件中，通过ReverseOrientation来管理其状态
+
+```c++
+<<Sphere Public Methods>>= 
+Sphere(const Transform *renderFromObject, const Transform *objectFromRender,
+       bool reverseOrientation, Float radius, Float zMin, Float zMax,
+       Float phiMax)
+    : renderFromObject(renderFromObject), objectFromRender(objectFromRender),
+      reverseOrientation(reverseOrientation),
+      transformSwapsHandedness(renderFromObject->SwapsHandedness()),
+      radius(radius),
+      zMin(Clamp(std::min(zMin, zMax), -radius, radius)),
+      zMax(Clamp(std::max(zMin, zMax), -radius, radius)),
+      thetaZMin(std::acos(Clamp(std::min(zMin, zMax) / radius, -1, 1))),
+      thetaZMax(std::acos(Clamp(std::max(zMin, zMax) / radius, -1, 1))),
+      phiMax(Radians(Clamp(phiMax, 0, 360))) {}
+```
+
+```c++
+<<Sphere Private Members>>= 
+Float radius;
+Float zMin, zMax;
+Float thetaZMin, thetaZMax, phiMax;
+const Transform *renderFromObject, *objectFromRender;
+bool reverseOrientation, transformSwapsHandedness;
+```
+
+### 6.2.1 包围
+
+为球面计算物体空间中的包围盒十分简单。当只渲染一部分球面时，此处的实现使用了用户提供的$z_{min},z_{max}$来围住边界。然而，当$\phi_{max}$小于$\frac{3\pi}{2}$时，此方式不会计算更紧凑的包围盒。这个优化会留作练习。此物体空间中的包围盒在返回前已被转为渲染空间坐标
+
+```c++
+<<Sphere Method Definitions>>
+Bounds3f Sphere::Bounds() const {
+    return (*renderFromObject)(
+        Bounds3f(Point3f(-radius, -radius, zMin),
+                 Point3f( radius,  radius, zMax)));
+}
+```
+
+球面的NormalBounds()方法不会考虑任何形式的部分球面，但是总会返回所有可能方向的整个球面的包围盒
+
+```c++
+<<Sphere Public Methods>>
+DirectionCone NormalBounds() const { return DirectionCone::EntireSphere(); }
+```
+
+### 6.2.2 相交测试
+
+光线的相交测试被分为两个阶段，首先，BasicIntersect()执行基本的光线到球面的相交测试，并返回一个小的结构体:QuadricIntersection,若交点被找到，会继续调用InteractionFromIntersection()方法，把QuadricIntersection转换为参数更全面的SurfaceInteraction,此对象可被Intersection()返回
+
+把相交测试拆成2个阶段的动机有2个：其一是这么做允许IntersectP()的实现可以看作BasicIntersect()的封装。其二是pbrt的GPU渲染是被组织好的，因此所有形状中最近的交点会在完整的SurfaceInteraction被构造前就找到，这种拆分与其直接匹配。
+
+```c++
+<<Sphere Public Methods>>
+pstd::optional<ShapeIntersection> Intersect(const Ray &ray,
+                                            Float tMax = Infinity) const {
+    pstd::optional<QuadricIntersection> isect = BasicIntersect(ray, tMax);
+    if (!isect) return {};
+    SurfaceInteraction intr =
+        InteractionFromIntersection(*isect, -ray.d, ray.time);
+    return ShapeIntersection{intr, isect->tHit};
+}
+```
+
+QuadricIntersection存储了沿着光线方向到交点的参数化的t，物体空间的交点，盒球面的$\phi$值。就如其名，此结构体会被其他二次曲面以同种方式使用。
+
+```c++
+struct QuadricIntersection {
+    Float tHit;
+    Point3f pObj;
+    Float phi;
+};
+```
+
+最基础的相交测试会把提供的渲染空间中的光线转换到物体空间，然后让其与完整的球面求交。如果定义的是一个球面的一部分，当与已被去除的球面部分相交时，会有一些额外的测试来拒绝此种情况
+
+```c++
+<<Sphere Public Methods>>+=  
+pstd::optional<QuadricIntersection> BasicIntersect(const Ray &r,
+                                                   Float tMax) const {
+    Float phi;
+    Point3f pHit;
+    <<把光线的原点和方向转换为物体空间>> 
+    <<解二次曲面方程计算出球面的t0和t1>> 
+    <<检查t0和t1，找到最近的交点>> 
+    <<找到交点位置和phi>> 
+    <<根据裁剪参数检测球面的相交>> 
+    <<若球面有交点则返回QuadricIntersection>> 
+}
+```
+
+转换后的光线原点和方向分别存储于Point3fi和Vector2fi类中，而不是Point3f和Vector3f。这些类代表了在每个维度下的微小间隔量，此间隔量把使用变换时引入的浮点数舍入误差框了起来。在后文中，我们会看到这些误差的范围对于改进相交计算的集合精确度是很有用的。在大部分时候，这些类可以像Point3f和Vector3f一样使用。
+
+```c++
+<<把光线的原点和方向转换为物体空间>>
+Point3fi oi = (*objectFromRender)(Point3fi(r.o));
+Vector3fi di = (*objectFromRender)(Vector3fi(r.d));
+```
+
+根据方程3.4，用光线参数化的表示替换掉球面隐函数，我们就有
+
+$$
+(o_x+t\vec{d_x})^2+(o_y+t\vec{d_y})^2+(o_z+t\vec{d_z})^2=r^2
+$$
+
+注意，此方程的所有元素中，除了t外，值都是已知的。此方程中的t给出了满足球面方程且沿着光线方向的一个参数化的位置，因此此点就是光线与球面的交点。我们可以扩展此方程为一个更通用的关于t的二次曲面方程:
+
+$$
+at^2+bt+c=0
+$$
+
+此处
+
+$$
+\begin{aligned}
+a=&\vec{d_x^2}+\vec{d_y^2}+\vec{d_z^2}\\
+b=&2(\vec{d_x}o_x+\vec{d_y}o_y)+\vec{d_z}o_z)\\
+c=&o_x^2+o_y^2+o_z^2-r^2
+\end{aligned}
+$$
 
 ## 6.3 圆柱体
 
 ## 6.4 圆盘
 
 ## 6.5 三角网格
+
+在计算机图形学中，三角形是其中被最广泛使用的形状。为了达到较好的细节效果，复杂场景可能会使用百万个三角形来建模。
+
+虽然一种最自然的表示法是使用shape接口来实现存储三个顶点值的Triangle对象，但是有一种更省内存的表示法是把全部三角网格用它的三个顶点存为一个数组，其中每个单独的三角形为其三个顶点在数组中只存三个偏移量。为了见识到为什么这样做，考虑一个著名的公式：欧拉-庞加莱公式，此公式把在封闭离散网格上的顶点V，边E和面F以下式做了关联:
+
+$$
+V - E + F = 2(1-g)
+$$
+
+此处$g\in N$中的g为网格的亏格，亏格一般来讲是一个比较小的数字，并且可以被解释为网格中的"把手"数量(类比为茶壶的把手)。对于一个三角网格，边和顶点的数量有着更多的关联，如下式:
+
+> 亏格就是曲面上孔的数量，比如球体亏格为0，圆环亏格为1
+>
+> N代表自然数集
+
+$$
+E=\frac{3}{2}F
+$$
+
+这可以通过将每条边分成与两个相邻三角形相关的两部分来理解.有3F个这样的半边，重合的一对构成了E个网格的边。对于大的封闭的三角网格，亏格总体的影响一般来讲可以忽略，并且我们可以合并之前的2个方程(设g=0)，可得:
+
+$$
+F\approx 2V
+$$
+
+> 巨大封闭三角网格体中，亏格被忽略，由上式可得F=2V-4,但是4也被忽略了
+
+换句话说，面的数量近似等于2倍顶点数量。既然每个面引用了3个顶点，每个顶点平均被引用6次，那么当顶点是共享的时候，平摊下来，每个三角形总的需要偏移12字节(三个32位整形数需要4字节)，加上一个顶点一半的存储6字节，假设是用三个4字节的浮点数来存储顶点位置，那么总共每个三角形要18字节。这比起每个三角形以直接存储3个顶点的方式(需要36字节)来说要好多了。当网格中有每个顶点的法线或纹理坐标的时候，能节省的存储空间更多。
+
+> 顶点共享时，至少2个三角形，一个顶点至少共享2次，本来需要2个顶点的空间只需1个空间，平摊下来就节省了一半空间，故取一个顶点一半的空间($4 \times 3 / 2= 12 / 2 = 6$)
+>
+> 偏移量是用来指向这个共享顶点的地址，就是指针，三个偏移量是因为分别对应了x,y,z,一个指针32bit=4byte，故$3 \times 4 = 12$byte
+
+### 6.5.1 网格的表示和存储
+
+pbrt用TriangleMesh类来存储关于一个三角网格的共享信息。在util/mesh.h和util.mesh.cpp中定义
+
+```c++
+<<TriangleMesh Definition>>= 
+class TriangleMesh {
+  public:
+    <<TriangleMesh Public Methods>> 
+    <<TriangleMesh Public Members>> 
+};
+```
+
+除了顶点位置和顶点索引，还可以提供每个顶点的法线n,切向量s,纹理坐标uv，若没有对应的参数，需要传空，若有，则需要与p有相同的元素数量
+
+```c++
+<<TriangleMesh Method Definitions>>
+TriangleMesh::TriangleMesh(
+        const Transform &renderFromObject, bool reverseOrientation,
+        std::vector<int> indices, std::vector<Point3f> p,
+        std::vector<Vector3f> s, std::vector<Normal3f> n,
+        std::vector<Point2f> uv, std::vector<int> faceIndices, Allocator alloc)
+    : nTriangles(indices.size() / 3), nVertices(p.size()) {
+    <<Initialize mesh vertexIndices>> 
+    <<Transform mesh vertices to rendering space and initialize mesh p>> 
+    <<Remainder of TriangleMesh constructor>> 
+}
+```
+
+网格的数据可通过共有成员变量获取，与点坐标和射线方向的成员设计类似，有一些微小的益处，同时也带来了一些困扰。
+
+```c++
+<<TriangleMesh Public Members>>
+int nTriangles, nVertices;
+const int *vertexIndices = nullptr;
+const Point3f *p = nullptr;
+```
+
+虽然此构造器取std::vector的参数，TriangleMesh存储了指向其数组的普通指针。verTexIndices指针指向了3*nTriangles的值，同时，每个顶点的指针，若非nullptr,则指向nVertices的值
+
+我们选择这样的设计以便不同的TriangleMeshes对象能够在它们有一些或全部参数相同时，指向同一个内存中的数组。虽然pbrt提供了对象实例化的能力，让同一个几何体可以拷贝多份并带有不同的变换矩阵，放置在场景中(比如在7.1.2中描述的TransformedPrimitive对象),但是，提供给其的场景不总是能充分利用这个能力。比如：在图5.11和7.2中的地形场景，有超过400MB用来检测这种多余数组的内存被节省了下来。
+
+BufferCache类根据传给它的每个缓冲，来处理存储一份单独拷贝的细节。此类的LookupOrAdd()方法，取一个它所管理的类型的std::vector，然后返回一个指向相同值的指针
+
+```c++
+<<Initialize mesh vertexIndices>>
+vertexIndices = intBufferCache->LookupOrAdd(indices, alloc);
+```
+
+### 6.5.2 Triangle类
+
+## 6.6 双线性贴片
+
+## 6.7 曲线
+
+## 6.8 舍入误差的管理
+

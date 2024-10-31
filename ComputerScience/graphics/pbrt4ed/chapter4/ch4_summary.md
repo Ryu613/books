@@ -6,35 +6,30 @@
 
 ## 四个基本量
 
-辐射通量(flux), 辐射强度(intensity), 辐照度(irradiance), 辐射度(radiance)
+能量(energy), 辐射通量(flux/power), 辐射强度(intensity), 辐照度(irradiance), 辐射度(radiance)
 
 1. 辐射通量(flux, 或power)
 
-    代表在单位时间内传递到某个表面或空间的能量总和。单位是焦耳每秒(J/s)或者瓦特(W)。
+    瞬时能量($\Phi$):用于描述光源发光量。单位是焦耳每秒(J/s)或者瓦特(W)
 2. 辐射强度(intensity)
 
-    即单位球面上的辐射通量，用于描述光在某个方向上的分布，只有点光源的情况下才有意义。用I表示，单位是W/sr
-
-    例：设某单位球体的球心为点光源，则球面的辐射强度为:
-    $$
-    I = \frac{\Phi}{4\pi}
-    $$
+    即单位角下的辐射通量(I), 单位是W/sr，用极限推广后就是某方向的发光量
 
 3. 辐照度(irradiance)
 
-    即单位面积上的辐射通量,用E表示，单位是$W/m^2$
+    即单位面积上的辐射通量(E)，单位是$W/m^2$，用极限做推广后就是某点上的发光量
 
-    例: 设某球体半径为r，球心为点光源，则球面的辐照度为:
-    $$
-    E=\frac{\Phi}{4\pi r^2}
-    $$
 4. 辐射度(radiance)
 
-    即单位面积和单位立体角下的辐射通量，用L表示，$L(p,\omega)$代表某点p在入射光立体角$\omega$下的辐射度。下标o代表出射光，i代表入射光
+    即光源上某点在某个方向上的发光量(L), $L(p,\omega)$代表某点p在入射光立体角$\omega$下的辐射度。下标o代表出射光，i代表入射光
     $$
-    L(p,\omega)=\lim_{\Delta\omega\to 0}\frac{\Delta E_\omega(p)}{\Delta\omega} = \frac{dE_\omega(p)}{d\omega}
+    L(p,\omega)=\lim_{\Delta\omega\to 0}\frac{\Delta E_\omega(p)}{\Delta\omega} = \frac{dE_\omega(p)}{d\omega}=\frac{d^2\Phi}{d\omega dA^{\bot}}
     $$
-    $E_\omega$代表垂直于$\omega$方向的面的辐照度，也就是说，辐射度并不是指辐射通量中p所在的面的通量。这种表示法去除了在兰伯特定律中的$\cos\theta$
+    $dA^{\bot}$表示垂直于$\omega$立体角的面,是根据朗伯定律得到的($A^{\bot}=A\cos\theta$)
+
+## 光谱分布
+
+不同波长的光有不同的辐射量，以横轴为波长($\lambda$)，纵轴为辐射量(L)的方式得到的曲线图就叫光谱分布
 
 ## 什么是光度学
 

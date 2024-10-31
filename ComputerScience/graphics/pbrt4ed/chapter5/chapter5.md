@@ -287,7 +287,7 @@ struct CameraBaseParameters {
 
 ![图5.2](img/fg5_2.png)
 
-图5.2 为了简化相机类的实现，有几种相机相关的坐标空间被普遍使用。camera类持有这些空间之间的转换方法。在渲染空间下的场景中的物体会被相机观察到，这些物体在以相机控件的原点，指向+z轴方向上。在近平面和远平面之间的物体，会被投影到胶片平面，胶片平面即在相机空间中z=near的平面。胶片平面在光栅空间中就是z=0的面，在光栅空间中，x，y的范围就是图片分辨率的x,y像素数。NDC空间归一化了光栅空间，所以x,y值在(0,0)到(1,1)之间
+图5.2 为了简化相机类的实现，有几种相机相关的坐标空间被普遍使用。camera类持有这些空间之间的转换方法。在渲染空间下的场景中的物体会被相机观察到，这些物体在以相机空间的原点，指向+z轴方向上。在近平面和远平面之间的物体，会被投影到胶片平面，胶片平面即在相机空间中z=near的平面。胶片平面在光栅空间中就是z=0的面，在光栅空间中，x，y的范围就是图片分辨率的x,y像素数。NDC空间归一化了光栅空间，所以x,y值在(0,0)到(1,1)之间
 
 除了CameraBase类需要的参数外，ProjectiveCamera也需拿到投影变换矩阵、图像在屏幕空间的范围、焦距、和透镜光圈大小的参数。如果光圈不是一个无穷小的孔，那么图像中的一部分可能会变得模糊(在真实的透镜系统中，聚焦范围外的物体会模糊)。这种效果的模拟会在后面的章节详述
 
@@ -355,9 +355,8 @@ Transform rasterFromScreen, screenFromRaster;
 
 与正交投影相似的是透视投影相机也会把长方体空间投影到二维胶片的面上，但是，会有近大远小效果。物体投影后会产生形状变化，这种方式与人眼和相机镜头的原理相似。不像正交投影，透视投影不会保持距离和角不变，并且平行线也不会一直平行。
 
-<<PerspectiveCamera的定义>>
-
 ```c++
+<<PerspectiveCamera的定义>>
 class PerspectiveCamera : public ProjectiveCamera {
   public:
     <<PerspectiveCamera的Public方法>> 
@@ -366,9 +365,8 @@ class PerspectiveCamera : public ProjectiveCamera {
 };
 ```
 
-<<PerspectiveCamera的Public方法>>
-
 ```c++
+<<PerspectiveCamera的Public方法>>
 PerspectiveCamera(CameraBaseParameters baseParameters, Float fov,
                   Bounds2f screenWindow, Float lensRadius, Float focalDist)
     : ProjectiveCamera(baseParameters, Perspective(fov, 1e-2f, 1000.f),
@@ -386,9 +384,8 @@ PerspectiveCamera(CameraBaseParameters baseParameters, Float fov,
 
 图5.6 透视变换矩阵把相机空间中的点投影到近平面上。投影后的坐标x'和y'等于投影前x,y坐标除以z坐标。上图中，用箭头表示了投影的效果。投影后的z'之后会计算出来，那么近平面上一点会映射到z'=0的面上,远平面一点会映射到z'=1的面上
 
-<<变换函数的定义>>
-
 ```c++
+<<变换函数的定义>>
 Transform Perspective(Float fov, Float n, Float f) {
     <<为透视投影执行投影的除法>> 
     <<把正则透视的视野缩放到这个fov>> 

@@ -28,7 +28,7 @@ pbrt-v4, GAMES202更新中
 
 ### 4. [数学](Math/readme.md)
 
-### 5. [物理学](physics/readme.md)
+### 5. [物理学](Physics/readme.md)
 
 ### 6. [复杂性科学](Complexity/readme.md)
 

@@ -128,8 +128,8 @@ $$
 在pbrt里，光谱有一个接口:Spectrum类，此类提供了一组通用方法，核心方法是operator()，可根据波长lambda来取出对应的辐射量I的值。其有多个实现类，包括:
 
 - 常数化光谱:ConstantSpectrum, 即所有波长下，辐射量都为一个常数
-- 密集采样光谱:denselySampledSpectrum, 以一个std:array方式存储了波段里，每个整数纳米波长下的辐射量
-- 线性分段光谱: PiecewiseLinearSpectrum: 用(波长，辐射量)为顶点，定义光谱分布，两个顶点之间的波长对应的辐射量，采取插值法获取，主要用于减少密集采样光谱占用的内存
+- 密集采样光谱:denselySampledSpectrum, 以一个std:array方式存储了某个波长范围内，以1纳米为间隔给出对应的辐射量
+- 线性分段光谱: PiecewiseLinearSpectrum: 只定义某个波长下的辐射量作为点，两个顶点之间的值用插值法求得，比密集采样光谱更节省内存
 
 ## 光谱的计算
 

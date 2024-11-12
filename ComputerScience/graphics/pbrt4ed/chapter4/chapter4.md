@@ -751,14 +751,172 @@ for (int i = 0; i < NSpectrumSamples; ++i)
 
 ## 4.6 色彩
 
+> 总结性陈述
+
+基于人类的三种视锥细胞的三原色理论，建模出光谱匹配函数，设光谱分布函数为$S(\lambda)$,三个三刺激匹配函数为$m_{\{1,2,3\}}(\lambda)$,可得出对应的三个三刺激值$v_i$:
+
+$$
+v_i=\int S(\lambda)m_i(\lambda)d\lambda
+$$
+
+这个匹配函数可用来定义一个三维的色彩空间，并有如下特点:
+
+1. 两个不同光谱合并后的三刺激值等于各自光谱的三刺激值相加
+   例: 设有2个光谱S1,S2,三刺激值分别是(X1,Y1,Z1)和(X2,Y2,Z2)，则光谱合并后的三刺激值就是(X1+X2, Y1+Y2, Z1+Z2)
+2. 对于一个被常数缩放的光谱，其三刺激值也可通过将原三刺激值乘以相同的缩放因子得到
+   例：若某个光谱S1的缩放因子为k，则缩放后的三刺激值为$(k\times X_1, k\times  Y_1, k\times  Z_1)$
+
+但要注意，两个光谱相乘的三刺激值并不等于各自光谱的三刺激值相乘，这也是为什么用RGB这样的三原色来渲染不会得出精确结果的原因。
+
+pbrt中颜色相关的类放在util/color.h和util/color.cpp文件中
+
 ### 4.6.1 XYZ色彩
+
+> 总结性陈述
+
+XYZ颜色空间是由CIE制定的标准，这个颜色空间是设备独立的，也就是说跟使用的显示或颜色测量设备无关
+
+XYZ颜色空间的XYZ分别表示红绿蓝，值可由下式求出(其中$S(\lambda)$是光谱分布函数)
+
+$$
+x_\lambda=\frac{1}{\int_\lambda Y(\lambda)d\lambda}\int_\lambda S(\lambda)X(\lambda)d\lambda\\
+y_\lambda=\frac{1}{\int_\lambda Y(\lambda)d\lambda}\int_\lambda S(\lambda)Y(\lambda)d\lambda \tag{4.22}\\
+z_\lambda=\frac{1}{\int_\lambda Y(\lambda)d\lambda}\int_\lambda S(\lambda)Z(\lambda)d\lambda
+$$
+
+$X(\lambda),Y(\lambda),Z(\lambda)$函数由下图给出
+
+![图4.18](img/fg4_18.png)
+
+上面式子中的$Y(\lambda)$与光谱响应曲线里用来定义光照的光度量的$V(\lambda)$成比例，关系是$V(\lambda)=683Y(\lambda)$
+
+> 上式中都有一个分数，是用于做标准化，使$x_\lambda + y_\lambda + z_\lambda = 1$
+>
+> 选用Y作为参考亮度，所以归一化是用Y的总色度作为标准化因子
+
+注意，不同的光谱可能具有非常相似的$x_\lambda,y_\lambda,z_\lambda$值，对于人类来说，看上去颜色是相同的, 颜色相同的两个光谱叫做异色同谱(metamers)
+
+下图展示了可视光的每个波长对应的XYZ因子组成的三维曲线图，也就是说，每个光谱分布都可以用XYZ因子的线性组合来表示其色彩，但是不是所有XYZ的线性组合对应了现实中存在的色彩，这些不存在的颜色对应的因子组合叫做虚构色彩
+
+![图4.19](img/fg4_19.png)
+
+可视光波长下的CIE标准XYZ匹配曲线参数在Spectra命名空间内储存，其中$Y(\lambda)$是预计算出来的常数值
+
+```c++
+<<Spectral Function Declarations>>+= 
+namespace Spectra {
+    const DenselySampledSpectrum &X();
+    const DenselySampledSpectrum &Y();
+    const DenselySampledSpectrum &Z();
+}
+```
+
+```c++
+<<Spectrum Constants>>+= 
+static constexpr Float CIE_Y_integral = 106.856895;
+```
+
+同时，有一个XYZ类来表示XYZ颜色,此类可用来计算光谱到XYZ的颜色值,根据公式4.22，需要算积分，这个积分不是用蒙特卡洛估计的，而是黎曼和
+
+```c++
+<<XYZ Definition>>= 
+class XYZ {
+  public:
+    <<XYZ Public Methods>> 
+    <<XYZ Public Members>> 
+};
+```
+
+对于SampledSpectrum对应的XYZ因子计算，是根据公式4.22用蒙特卡洛估计法求得，式子如下:
+
+$$
+x_\lambda \approx \frac{1}{\int_\lambda Y(\lambda)d\lambda}\bigg(\frac{1}{n}\sum_{i=1}^n\frac{s_i X(\lambda_i)}{p(\lambda_i)}\bigg)
+$$
+
+其中$s_i$是在波长$\lambda_i$下的光谱量(即radiance)，对应的函数就是SampledSpectrum::ToXYZ()
+
+```c++
+<<Spectrum Method Definitions>>+=  
+XYZ SampledSpectrum::ToXYZ(const SampledWavelengths &lambda) const {
+    <<Sample the X, Y, and Z matching curves at lambda>> 
+    <<Evaluate estimator to compute  coefficients>> 
+}
+```
+
+具体步骤详见代码
+
+#### 色度与xyY颜色
+
+> 总结性陈述
+
+颜色可分为亮度(lightness)和色度(chroma),亮度代表相对于白色有多白，色度代表相对于白色的颜色值。用于量化色度的其中一种方式就是xyz色度坐标，此坐标是根据XYZ色彩空间坐标来定义的,公式如下:
+
+$$
+x=\frac{x_\lambda}{x_\lambda+y_\lambda+z_\lambda}
+$$
+$$
+x=\frac{y_\lambda}{x_\lambda+y_\lambda+z_\lambda}
+$$
+$$
+x=\frac{z_\lambda}{x_\lambda+y_\lambda+z_\lambda}=1-x-y
+$$
+
+也就是说，已知任意两个坐标量，即可定义色度
+
+若已知x,y,我们就能画出色度图，见图4.20，此图就是单个波长下的光谱颜色。对应了图4.19里的XYZ曲线，所有可用的颜色都在这个倒马蹄型里面，外面的部分就是虚构色彩的部分
+
+![图4.20](img/fg4_20.png)
+
+xyY色彩空间进一步从色度坐标里把亮度剔除，方法就是只用x,y的色度坐标值，和XYZ颜色空间里的$y_\lambda$来表示(其中$Y(\lambda)$是匹配曲线，看作光照的比例参考)，pbrt里没有xyY类，但是在XYZ类里提供了返回xy色度值的方法
+
+```c++
+<<XYZ Public Methods>>+=  
+Point2f xy() const {
+    return Point2f(X / (X + Y + Z), Y / (X + Y + Z));
+}
+```
+
+也提供了从xyY转换为XYZ的方法
+
+```c++
+<<XYZ Public Methods>>+= 
+static XYZ FromxyY(Point2f xy, Float Y = 1) {
+    if (xy.y == 0)
+        return XYZ(0, 0, 0);
+    return XYZ(xy.x * Y / xy.y, Y, (1 - xy.x - xy.y) * Y / xy.y);
+}
+```
 
 ### 4.6.2 RGB色彩
 
+> 总结性陈述
+
+在渲染程序中，RGB色彩是比XYZ更常见的选择。RGB的值必须有一个特定的RGB色彩空间来对照才有用。这是因为不同的显示设备中，同一个颜色的显示，对应了不同的光谱分布。
+
+若某个显示设备的$R(\lambda),G(\lambda),B(\lambda)$曲线已知，那么对于显示某个光谱分布$S(\lambda)$的RGB因子就可知，比如红色值r就可通过下式求得，同理可得g,b:
+
+$$
+r=\int R(\lambda)S(\lambda)d\lambda
+$$
+
+若给定RGB的响应曲线，就可以在XYZ色彩和RGB色彩做转换
+
+在pbrt中，RGB色彩用RGB类表示，此类还提供了一些便利的相关操作
+
 ### 4.6.3 RGB色彩空间
 
-### 4.6.4 为什么用光谱渲染?
+> 总结性陈述
+
+要定义色彩空间，没必要使用完整的光谱响应曲线。只用矩阵就可以实现XYZ和其他颜色空间的转换。pbrt里在util/colorspace.h和对应的cpp文件封装了色彩空间的转换功能
+
+#### 标准色彩空间
+
+> 总结性陈述
+
+pbrt内置了一些标准色彩空间，包括sRGB,DCI-P3, Rec2020, ACES2065-1
+
+### 4.6.4 为什么用光谱渲染
 
 ### 4.6.5 波长样本数量的选择
 
-### 4.6.6 从RGB到光谱
+### 4.6.6 把RGB转换为光谱

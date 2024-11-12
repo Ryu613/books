@@ -630,9 +630,8 @@ PixelSensor构造器取感光器的RGB匹配函数-$\bar{r},\bar{g}$和$\bar{b}$
 
 图5.19表示了对相机响应建模的效果，对比用XYZ匹配函数来计算初始像素值来渲染，和用确切相机感光器的匹配函数来渲染。
 
-<<PixelSensor Public Methods>>
-
 ```c++
+<<PixelSensor Public Methods>>
 PixelSensor(Spectrum r, Spectrum g, Spectrum b,
        const RGBColorSpace *outputColorSpace, Spectrum sensorIllum,
        Float imagingRatio, Allocator alloc)
@@ -642,9 +641,8 @@ PixelSensor(Spectrum r, Spectrum g, Spectrum b,
 }
 ```
 
-<<PixelSensor Private Members>>
-
 ```c++
+<<PixelSensor Private Members>>
 DenselySampledSpectrum r_bar, g_bar, b_bar;
 Float imagingRatio;
 ```
@@ -669,19 +667,17 @@ $$
 
 同时，只要有超过三种反射率值，问题就会成为一个超定问题，可以通过线性最小二乘法来求解。
 
+```c++
 <<从相机RGB矩阵计算XYZ>>
-
 <<计算用于训练的色块的相机RGB值>>
-
 <<为用于训练的色块计算xyzOutput值>>
-
 <<利用线性最小二乘法来初始化XYZFromSensorRGB>>
+```
 
 给定感光器的光照量，为每个被ProjectReflectance()处理的反射率计算RGB的相关系数
 
-<<计算用于训练的色块的相机RGB值>>
-
 ```c++
+<<计算用于训练的色块的相机RGB值>>
 Float rgbCamera[nSwatchReflectances][3];
 for (int i = 0; i < nSwatchReflectances; ++i) {
     RGB rgb = ProjectReflectance<RGB>(swatchReflectances[i], sensorIllum,

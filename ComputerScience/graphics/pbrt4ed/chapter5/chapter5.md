@@ -908,7 +908,7 @@ SampledWavelengths SampleWavelengths(Float u) const {
 }
 ```
 
-SampleBounds()方法只需给定Filter，也可以被简单实现。计算样本的边界框涉及滤波器半径的扩展和在pbrt中像素坐标的半个像素距离的偏移量。详见8.1.4
+SampleBounds()方法只需给定Filter，也可以被简单实现。计算样本的边界范围涉及到滤波器半径和半个像素的偏移量(此偏移量来自pbrt中对于像素坐标的例行处理方法)。详见8.1.4
 
 <<FilmBase的方法定义>>
 

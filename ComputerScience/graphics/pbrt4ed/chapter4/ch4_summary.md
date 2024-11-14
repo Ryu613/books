@@ -18,7 +18,7 @@
 
 ## 五个基本量
 
-能量(energy), 辐射通量(flux/power), 辐射强度(intensity), 辐照度(irradiance), 辐射度(radiance)
+能量(energy), 辐射功率(flux/power), 辐射强度(intensity), 辐照度(irradiance), 辐射度(radiance)
 
 1. 能量(Energy)
 
@@ -30,16 +30,16 @@
     - h是普朗克常数$h\approx 6.626 \times 10^{-34} m^2kg/s$
     - λ是光波的波长,这里的单位是m，但是后文为了方便描述，用nm
 
-2. 辐射通量(flux, 或power)
+2. 辐射功率(flux, 或power)
 
     极小时间下的能量($\Phi$): 用于描述光源发光量。单位是焦耳每秒(J/s)或者瓦特(W)
 3. 辐射强度(intensity)
 
-    即极小立体角(omega:$\omega$)下的辐射通量(I), 单位是W/sr
+    即极小立体角(omega:$\omega$)下的辐射功率(I), 单位是W/sr
 
 4. 辐照度(irradiance)
 
-    即极小面积上的辐射通量(E)，单位是$W/m^2$
+    即极小面积上的辐射功率(E)，单位是$W/m^2$
 
 5. 辐射度(radiance)
 
@@ -113,7 +113,7 @@ $$
 \frac{\int \Phi_e(\lambda)V(\lambda)d\lambda}{\int \Phi_i(\lambda)d\lambda}
 $$
 
-这里的$\Phi_e(\lambda)$代表某波长下发光的辐射通量,$\phi_i(\lambda)$代表光源在某波长消耗的辐射量通量，积分就是求所有波长下的总辐射通量
+这里的$\Phi_e(\lambda)$代表某波长下发光的辐射功率,$\phi_i(\lambda)$代表光源在某波长消耗的辐射量功率，积分就是求所有波长下的总辐射功率
 
 ## 黑体
 
@@ -148,3 +148,6 @@ $$
 $L_i(p,\omega,\lambda)$就是入射光在波长$\lambda$下的辐射量
 
 为了对波长采样，抽象出了两个类SampledSpectrum和SampledWavelength,分别代表采样出来的一组光谱量(辐射量)，和对应的一组波长和pdf(概率分布)，把辐射量和波长的定义拆开，是为了方便在计算辐射量的时候，对不同类型的光谱分布类做计算。
+
+## 色彩的表示
+

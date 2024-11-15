@@ -452,4 +452,123 @@ pstd::optional<ShapeIntersection> si = Intersect(ray);
 
 若没有交点，那么此光线路径就结束了。在把路径累加后的辐射量估计值返回前，一些情况下，无限远光源的辐射量会被加到这条路径的辐射量估计值中，此贡献量会被累加后的beta因子进行缩放。
 
+若sampleLights为false，那么发光量只在光线与发光体相交时找到，这种情况下，无限远的面光源的贡献量必须把其加到那些没有与任何物体相交的光线上。若为true，那么积分器会调用Light对象的SampleLi()方法来估计每个路径顶点的直接光照量。在这种情况下，无限远的光已经被计算在内了，除了上一个顶点是镜面反射的BSDF的情况外。因此，specularBounce记录了是否最后的BSDF是完美镜面，这种情况下，面光源必须被包含在内。
+
+```c++
+<<Account for infinite lights if ray has no intersection>>= 
+if (!si) {
+    if (!sampleLights || specularBounce)
+        for (const auto &light : infiniteLights)
+            L += beta * light.Le(ray, lambda);
+    break;
+}
+```
+
+若光线与一个发光表面相交，也是与前文所述相同的逻辑。
+
+```c++
+<<Account for emissive surface if light was not sampled>>= 
+SurfaceInteraction &isect = si->intr;
+if (!sampleLights || specularBounce)
+    L += beta * isect.Le(-ray.d, lambda);
+```
+
+下一步，是找到交点的BSDF，有一种特别的情况要注意，当SurafaceInteraction的GetBSDF()返回了一个未设置的BSDF时，当前面应该对光没有效果。pbrt使用这种面来表示介质之间的过渡效果，这种介质的边界的光学效果是忽略的(比如它们在面的两侧有相同的折射索引)。由于SimplePathIntegrator忽略了介质，所以跳过了这种表面的相关计算
+
+```c++
+<<Get BSDF and skip over medium boundaries>>= 
+BSDF bsdf = isect.GetBSDF(ray, lambda, camera, scratchBuffer, sampler);
+if (!bsdf) {
+    isect.SkipIntersection(&ray, si->tHit);
+    continue;
+}
+```
+
+否则，我们有一个可用的表面交点，并且继续执行，depth+1.然后路径若达到最大深度则停止
+
+```c++
+<<End path if maximum depth reached>>
+if (depth++ == maxDepth)
+    break;
+```
+
+若显式的光照采样被执行，那么第一步就是使用UniformLightSampler来选择一个光源(回顾12.6，之采样场景的一个光源点，在给定合适权重的情况下，也能估计出所有光源的效果)
+
+```c++
+<<Sample direct illumination if sampleLights is true>>= 
+Vector3f wo = -ray.d;
+if (sampleLights) {
+    pstd::optional<SampledLight> sampledLight =
+        lightSampler.Sample(sampler.Get1D());
+    if (sampledLight) {
+        <<Sample point on sampledLight to estimate direct illumination>> 
+    }
+}
+```
+
+给定一个光源，调用SampleLi()获得一个在光源上的样本，若光的采样是可用的，就会执行直接光照算法
+
+```c++
+<<Sample point on sampledLight to estimate direct illumination>>= 
+Point2f uLight = sampler.Get2D();
+pstd::optional<LightLiSample> ls =
+    sampledLight->light.SampleLi(isect, uLight, lambda);
+if (ls && ls->L && ls->pdf > 0) {
+    <<Evaluate BSDF for light and possibly add scattered radiance>> 
+}
+```
+
+以公式12.7返回的路径追踪估计式，我们就有了路径的吞吐权重beta，这个值对应了式子中括号里的部分。调用SampleLi()会生成一个样点。由于光采样方法是根据立体角采样的，而不是面上，我们有必要用雅各比纠正项，估计式会变成:
+
+$$
+P(\vec{p_i})=\frac{L_e(p_i\rightarrow p_{i-1})f(p_i \rightarrow p_{i-1} \rightarrow p_{i-2})\vert\cos\theta_i\vert V(p_i \leftrightarrow p_{i-1})}{p_l(\omega_i)p(l)}\beta \tag{13.9}
+$$
+
+此处$p_l$是给定光源l在$\omega_i$的立体角密度，$p(l)$是采样更远l的离散概率(回顾等式12.2).它们的乘积给出了光源采样的总体概率
+
+在对阴影光线追踪以计算出可视因子V前，有必要检查对于采样的方向的BSDF是否是0，在这种亲口光下，计算的开销是没必要的
+
+```c++
+<<Evaluate BSDF for light and possibly add scattered radiance>>= 
+Vector3f wi = ls->wi;
+SampledSpectrum f = bsdf.f(wo, wi) * AbsDot(wi, isect.shading.n);
+if (f && Unoccluded(isect, ls->pLight))
+    L += beta * f * ls->L / (sampledLight->p * ls->pdf);
+```
+
+Unoccluded()是由Integrator基类提供的遍历方法
+
+```c++
+<<Integrator Public Methods>>+= 
+bool Unoccluded(const Interaction &p0, const Interaction &p1) const {
+    return !IntersectP(p0.SpawnRayTo(p1), 1 - ShadowEpsilon);
+}
+```
+
+为了采样出下一个路径顶点，通过调用BSDF的采样方法或均匀采样，来找到光线离开表面时的方向，这取决于sampleBSDF这个参数
+
+```c++
+<<Sample outgoing direction at intersection to continue path>>= 
+if (sampleBSDF) {
+    <<Sample BSDF for new path direction>> 
+} else {
+    <<Uniformly sample sphere or hemisphere to get new path direction>> 
+}
+```
+
+若使用的是BSDF采样，Sample_f()方法能给出方向和关联的BSDF，PDF值。根据方程13.8,能够更新beta的值
+
+```c++
+<<Sample BSDF for new path direction>>= 
+Float u = sampler.Get1D();
+pstd::optional<BSDFSample> bs = bsdf.Sample_f(wo, u, sampler.Get2D());
+if (!bs)
+    break;
+beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
+specularBounce = bs->IsSpecular();
+ray = isect.SpawnRay(bs->wi);
+```
+
+否则，就按照代码片段<<在(半)球面均匀采样以获取心得路径方向>>执行。这段代码比RandomWalkIntegrator更精细，比如：若表面会反射，但是不会透射，代码会确认采样的方向是根据光散射所在的半球面上的。我们不会在此包含这段代码片段，因为此片段必须处理一堆场景，没有太大必要关注其内部工作细节。
+
 ## 13.4 更好的路径追踪

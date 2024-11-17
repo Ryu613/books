@@ -69,6 +69,8 @@
 > **重点章节**
 > 光传播方程推导，路径追踪原理和实现
 
+[第十三章重点总结](chapter13/ch13_summary.md)
+
 ## [第十四章 光的传播 II: 体渲染](chapter14/chapter14.md)
 
 ## [第十五章 利用wavefront在GPU上渲染](chapter15/chapter15.md)

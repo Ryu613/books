@@ -452,7 +452,9 @@ pstd::optional<ShapeIntersection> si = Intersect(ray);
 
 若没有交点，那么此光线路径就结束了。在把路径累加后的辐射量估计值返回前，一些情况下，无限远光源的辐射量会被加到这条路径的辐射量估计值中，此贡献量会被累加后的beta因子进行缩放。
 
-若sampleLights为false，那么发光量只在光线与发光体相交时找到，这种情况下，无限远的面光源的贡献量必须把其加到那些没有与任何物体相交的光线上。若为true，那么积分器会调用Light对象的SampleLi()方法来估计每个路径顶点的直接光照量。在这种情况下，无限远的光已经被计算在内了，除了上一个顶点是镜面反射的BSDF的情况外。因此，specularBounce记录了是否最后的BSDF是完美镜面，这种情况下，面光源必须被包含在内。
+若sampleLights为false，那么发光量只在光线与发光体相交时找到，这种情况下，无限远的面光源的贡献量必须把其加到那些没有与任何物体相交的光线上。若为true，那么积分器会调用Light对象的SampleLi()方法来估计每个路径顶点的直接光照量。在这种情况下，无限远的光已经被计算在内了，除了上一个顶点是镜面反射的BSDF的情况外。那么由于只有镜面反射方向会散射光，SampleLi()就没多少用了，因此，specularBounce记录了是否最后的BSDF是完美镜面，这种情况下，无限远面光源的量必须被包含在内。
+
+> 就是说，当sampleLights为true，路径中每个点还会通过调用SampleLi()来估算各个光源到这个点的直接光照量，包括无限远的面光源，但是在这个顶点之前的顶点的BSDF是来自镜面反射的时候，无限远光源的光量是没被包含其中的，所以当specularBounce为true的时候，还要加上这些无限远光源的量
 
 ```c++
 <<Account for infinite lights if ray has no intersection>>= 

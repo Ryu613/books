@@ -45,9 +45,8 @@ BSDF类也聚焦于让函数通用化，让BxDF的实现类不需要单独去操
 
 我们时常发现，在BSDF坐标系中关于表面的法线上，检查两个向量是否在同一个半球面上是很有用的，SameHemisphere()函数就用于此目的:
 
-<<球面几何体的内联函数>>
-
 ```c++
+<<球面几何体的内联函数>>
 bool SameHemisphere(Vector3f w, Vector3f wp) {
     return w.z * wp.z > 0;
 }
@@ -64,9 +63,8 @@ bool SameHemisphere(Vector3f w, Vector3f wp) {
 
 BxDF类是为每个独立的BRDF,BTDF定义接口，位置在base/bxdf.h
 
-<<BxDF的定义>>
-
 ```c++
+<<BxDF的定义>>
 class BxDF
     : public TaggedPointer<
           DiffuseBxDF, CoatedDiffuseBxDF, CoatedConductorBxDF,
@@ -79,18 +77,15 @@ class BxDF
 
 BxDF接口提供了一个方法来查找材质的类型，在13到15章中的一些光传播算法用来定制它们的表现。
 
-<<BxDF接口>>
-
 ```c++
+<<BxDF接口>>
 BxDFFlags Flags() const;
 ```
 
 BxDFFlags枚举列出来之前提到的分类，也会在透射中区分反射类型。注意，在这个类里，逆反射被视为抛光反射
 
-<<BxDFFlags的定义>>
-
 ```c++
-<<BxDFFlags Definition>>= 
+<<BxDFFlags的定义>> 
 enum BxDFFlags {
     Unset = 0,
     Reflection = 1 << 0,
@@ -104,9 +99,8 @@ enum BxDFFlags {
 
 这些常量也能用二元or操作符结合起来，来区分同时有多种特征的材质。通常情况下使用的混合材质,名字也会混合，如下:
 
-<<混合的BxDFFlags定义>>
-
 ```c++
+<<混合的BxDFFlags定义>>
 DiffuseReflection = Diffuse | Reflection,
 DiffuseTransmission = Diffuse | Transmission,
 GlossyReflection = Glossy | Reflection,
@@ -118,9 +112,8 @@ All = Diffuse | Glossy | Specular | Reflection | Transmission
 
 一些工具函数封装了测试各种特征的标识的逻辑
 
-<<BxDFFlags的内联函数>>
-
 ```c++
+<<BxDFFlags的内联函数>>
 bool IsReflective(BxDFFlags f) { return f & BxDFFlags::Reflection; }
 bool IsTransmissive(BxDFFlags f) { return f & BxDFFlags::Transmission; }
 bool IsDiffuse(BxDFFlags f) { return f & BxDFFlags::Diffuse; }
@@ -130,15 +123,14 @@ bool IsNonSpecular(BxDFFlags f) {
     return f & (BxDFFlags::Diffuse | BxDFFlags::Glossy); }
 ```
 
-BxDF对象的核心方法是f(),这个方法根据给定的一组向量，来返回分布函数的值。这组向量必须是以本地的反射坐标系描述的。
+BxDF对象的核心方法是f(),这个方法根据给定的一组向量，来返回分布函数的值。这组向量必须是以局部反射坐标系描述的。
 
 这个接口隐式地假设了光在不同波长下是独立的，在一个波长下的能量不会在另外一个波长下反映出来。在这种条件下，反射的效应可以被描述为每个波长的因子以SampledSpectrum的形式返回。那种会把波长之间的能量分布开来的荧光材质可能需要这个方法返回一个$n \times n$的矩阵，来表示在n个SampledSpectrum对象的光谱样本中传递。
 
 BxDF的实现类，既不在构造器，也不在方法中被告知特定波长与SampledSpectrum的关联，因为它们不需要这个信息
 
-<<BxDF的接口>>
-
 ```c++
+<<BxDF的接口>>
 SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const;
 ```
 
@@ -155,9 +147,8 @@ Sample_f()的实现应该确定在给定出射光方向$\omega_o$时确定入射
 
 这个方法的调用者必须准备处理采样失败的情况，这种情况下会返回一个没设置值的optional对象
 
-<<BxDF的接口>>
-
 ```c++
+<<BxDF的接口>>
 pstd::optional<BSDFSample>
 Sample_f(Vector3f wo, Float uc, Point2f u,
          TransportMode mode = TransportMode::Radiance,
@@ -166,9 +157,8 @@ Sample_f(Vector3f wo, Float uc, Point2f u,
 
 样本的生成能通过sampleFlags参数(可选),把效果限制在反射或者透射。在不合理的场景下，采样会失败，比如：若调用者在一个不透明表面上请求了一个透射的样本
 
-<<BxDFReflTransFlags的定义>>
-
 ```c++
+<<BxDFReflTransFlags的定义>>
 enum class BxDFReflTransFlags {
     Unset = 0,
     Reflection = 1 << 0,
@@ -181,9 +171,8 @@ enum class BxDFReflTransFlags {
 
 一些BxDF的实现(比如14.3章提到的LayeredBxDF)会通过仿真生成样本，然后跟随一个随机的光线路径。逃逸的路径的分布是精确的概率分布，但是返回的f和pdf只与真实值成比例。(还好，是成比例的!)这种情况需要在光线传播算法中做特殊的处理，并且这种亲口光通过pdfIsProportional来检测。对于本章所有的BxDF，都能默认设为false
 
-<<BSDFSample的定义>>
-
 ```c++
+<<BSDFSample的定义>>
 struct BSDFSample {
     <<BSDFSample Public Methods>> 
     SampledSpectrum f;
@@ -195,9 +184,8 @@ struct BSDFSample {
 };
 ```
 
-<<BSDFSample的public方法>>
-
 ```c++
+<<BSDFSample的public方法>>
 BSDFSample(SampledSpectrum f, Vector3f wi, Float pdf, BxDFFlags flags,
            Float eta = 1, bool pdfIsProportional = false)
     : f(f), wi(wi), pdf(pdf), flags(flags), eta(eta),
@@ -206,9 +194,8 @@ BSDFSample(SampledSpectrum f, Vector3f wi, Float pdf, BxDFFlags flags,
 
 一些实用方法可以通过之前提到的函数，比如BxDFFlags::IsReflective()，来查询样本的特征
 
-<<BSDFSample的public方法>>
-
 ```c++
+<<BSDFSample的public方法>>
 bool IsReflection() const { return pbrt::IsReflective(flags); }
 bool IsTransmission() const { return pbrt::IsTransmissive(flags); }
 bool IsDiffuse() const { return pbrt::IsDiffuse(flags); }
@@ -218,9 +205,8 @@ bool IsSpecular() const { return pbrt::IsSpecular(flags); }
 
 PDF()方法根据给定的一对方向返回PDF的值，这种方式对于类似多重重要性采样的方法来说很有用。多重重要性采样为了包含一个给定的样本，用多种方式的可能性做对比。
 
-<<BxDF的接口>>
-
 ```c++
+<<BxDF的接口>>
 Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
           BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
 ```
@@ -238,7 +224,7 @@ SampledSpectrum BxDF::rho(Vector3f wo, pstd::span<const Float> uc,
                           pstd::span<const Point2f> u2) const {
     SampledSpectrum r(0.);
     for (size_t i = 0; i < uc.size(); ++i) {
-        <<Compute estimate of >> 
+        <<Compute estimate of rho_hd>> 
     }
     return r / uc.size();
 }
@@ -252,15 +238,14 @@ $$
 
 就很容易估计出来了
 
-<<计算$\rho_{hd}$的估计值>>
-
 ```c++
+<<计算$\rho_{hd}$的估计值>>
 pstd::optional<BSDFSample> bs = Sample_f(wo, uc[i], u2[i]);
 if (bs)
     r += bs->f * AbsCosTheta(bs->wi) / bs->pdf;
 ```
 
-半球-半球的反射率在第二个BxDF::rho()方法，这个方法计算狮子4.13，与上一个rho()方法一样，调用者要负责传入一个均匀采样的值，在这种情况下，需要五个参数才够。
+半球-半球的反射率在第二个BxDF::rho()方法，这个方法计算式子4.13，与上一个rho()方法一样，调用者要负责传入一个均匀采样的值，在这种情况下，需要五个参数才够。
 
 <<BxDF的方法定义>>
 
@@ -292,9 +277,19 @@ if (bs)
 
 ### 9.1.4 BSDF的delta分布
 
-### 9.1.5 各种BSDF
+本章中的一些BSDF模型使用狄拉克delta分布来表示拥有完美镜面材质(比如光滑金属或玻璃表面)与光线的相互作用。
+
+### 9.1.5 多种BSDF
+
+> 总结性陈述
+
+此类封装了BxDF从本地坐标系到渲染坐标系的变换计算。BSDF类里持有BxDF类和Frame类(此类代表着色帧)。BxDF中的主要计算方法，如f(),Sample_f()等，都在此类进行实际调用。
 
 ## 9.2 漫反射
+
+> 总结
+
+最简单的BRDF就是朗伯模型，这种模型描述了完美漫反射表面，在所有方向上按相同概率进行散射。
 
 ## 9.3 镜面反射和透射
 

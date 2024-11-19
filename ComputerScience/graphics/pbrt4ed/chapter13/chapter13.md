@@ -475,7 +475,7 @@ if (!sampleLights || specularBounce)
     L += beta * isect.Le(-ray.d, lambda);
 ```
 
-下一步，是找到交点的BSDF，有一种特别的情况要注意，当SurafaceInteraction的GetBSDF()返回了一个未设置的BSDF时，当前面应该对光没有效果。pbrt使用这种面来表示介质之间的过渡效果，这种介质的边界的光学效果是忽略的(比如它们在面的两侧有相同的折射索引)。由于SimplePathIntegrator忽略了介质，所以跳过了这种表面的相关计算
+下一步，是找到交点的BSDF，有一种特别的情况要注意，当SurfaceInteraction的GetBSDF()返回了一个未设置的BSDF时，当前面应该对光没有效果。pbrt使用这种面来表示介质之间的过渡效果，这种介质的边界的光学效果是忽略的(比如它们在面的两侧有相同的折射索引)。由于SimplePathIntegrator忽略了介质，所以跳过了这种表面的相关计算
 
 ```c++
 <<Get BSDF and skip over medium boundaries>>= 
@@ -494,7 +494,7 @@ if (depth++ == maxDepth)
     break;
 ```
 
-若显式的光照采样被执行，那么第一步就是使用UniformLightSampler来选择一个光源(回顾12.6，之采样场景的一个光源点，在给定合适权重的情况下，也能估计出所有光源的效果)
+若显式的光照采样被执行，那么第一步就是使用UniformLightSampler来选择一个光源(回顾12.6，只采样场景的一个光源点，在给定合适权重的情况下，也能估计出所有光源的效果)
 
 ```c++
 <<Sample direct illumination if sampleLights is true>>= 
@@ -520,7 +520,7 @@ if (ls && ls->L && ls->pdf > 0) {
 }
 ```
 
-以公式12.7返回的路径追踪估计式，我们就有了路径的吞吐权重beta，这个值对应了式子中括号里的部分。调用SampleLi()会生成一个样点。由于光采样方法是根据立体角采样的，而不是面上，我们有必要用雅各比纠正项，估计式会变成:
+以公式12.7返回的路径追踪估计式，我们就有了路径的吞吐权重beta，这个值对应了式子中括号里的部分。调用SampleLi()会生成一个样点。由于光采样方法是根据立体角采样的，而不是面上，我们有必要用雅各比修正项，估计式会变成:
 
 $$
 P(\vec{p_i})=\frac{L_e(p_i\rightarrow p_{i-1})f(p_i \rightarrow p_{i-1} \rightarrow p_{i-2})\vert\cos\theta_i\vert V(p_i \leftrightarrow p_{i-1})}{p_l(\omega_i)p(l)}\beta \tag{13.9}

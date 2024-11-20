@@ -155,10 +155,6 @@ Transform类表示一个$4\times 4$的变换过程，用4x4矩阵m表示，成�
 
 ## 3.10 变换的应用
 
-
-
-## 3.10 几何变换的应用
-
 ## 3.11 相互作用
 
 SurfaceInteraction和MediumInteraction分别代表表面上的局部的点和在介质中的点的相互作用的信息。例如：在第六章中，光线与物体的相交过程，是用SurfaceInteraction返回交点局部的微分几何信息。在后续的第十章中，纹理相关的代码会利用SurfaceInteraction里的值来计算材质的属性。类似的，MediumInteraction类是用于光在介质中(比如烟雾，云)传播的场景。所有的这些实现放在interaction.h和interaction.cpp中

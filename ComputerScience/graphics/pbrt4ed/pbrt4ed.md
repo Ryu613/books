@@ -8,7 +8,9 @@
 >
 > pbrt代码本人注解版(fork自原始代码): [pbrt-v4-digest-cn](https://github.com/Ryu613/pbrt-v4-digest-cn)
 
-目前第一遍进行中，还不适宜读者参考
+## 推荐可读章节
+
+- [第五章 相机和胶片](chapter5/chapter5.md)
 
 ## [第一章 绪论](chapter1/chapter1.md)
 
@@ -36,7 +38,7 @@
 ## [第五章 相机和胶片](chapter5/chapter5.md)
 
 > **重点章节**
-> 相机，胶片，感光器理论及实现
+> 相机，胶片，感光器的理论及实现
 
 [第五章重点总结](chapter5/ch5_summary.md)
 

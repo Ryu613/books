@@ -1,273 +1,368 @@
 # 5 相机和胶片
 
-小孔成像忽略了透镜的聚焦效果，是全图清晰聚焦的，透镜只能部分聚焦，导致图像看起来不太真实，为了使图像更真实，需要模拟透镜的效果。
+在第一章中，我们介绍了小孔相机模型，此模型在计算机图形学中是被普遍使用的。虽然此模型的描述和模拟很简单，但是忽略了现实里光线穿过相机透镜时产生的重要的效果。例如，用小孔相机渲染的所有物体都是清晰聚焦的，这种效果在现实中使用了镜片系统的相机来说是不可能的。这也使图像像是为了完美而使用计算机生成出来的。更普遍地来说，光线在离开镜片系统的辐射分布，与进入镜片系统的辐射分布是完全不同的。为了精确模拟图像形成时的辐射度量，对透镜效果进行建模是很重要的。
 
-相机的透镜系统引入了各种图像畸变，比如图像边缘的晕影效果，和枕型，桶型失真等。
+> 为了获取更真实的图像，小孔相机是不够的，需要模拟相机镜片的效果
 
-在pbrt中，使用Film类来表示相机捕捉到的图像，用Camera接口来代表相机
+相机的镜片系统引入了在图像生成时的各种畸变效果；比如，vignetting(光晕)是由于通过胶片或感光元件边缘的光比起中心位置更少造成的图像边缘更暗的效果。镜片也可造成pincushion(枕形畸变)或barrel(桶形畸变)，使直线在成像后像条曲线。虽然，镜片的设计师的工作就是最小化畸变效果，但是这些效果依旧在图像上是有意义的。
 
-在本章中，会介绍2个Film的实现类，它们两个都使用PixelSensor类来代表特定感光器对光谱的响应效果，使其看起来像胶片拍的或是数码相机拍的，关于胶片和感光器的类会在本章最后一节介绍。
+> 镜片造成的图像畸变效果虽然本质是不期望发生的，但是也给人带来图像的真实感
+>
+> 枕形畸变: 画面向中心收缩，像个枕头
+> 
+> 桶形畸变: 画面由中心膨胀，像个桶，与枕形畸变正好相反
+
+本章将从Camera接口的描述开始，之后会用小孔相机模型作为出发点，来介绍此接口的实现类
+
+在光被相机捕获后，其携带的辐射量，会被传感器测量出来。传统胶片利用化学过程测量，而大部分现代相机使用拆分为像素的多个固态传感器测量，每个传感器会把在一段时间的某个波长范围内打到传感器上的光子数量进行统计。对于传感器如何测量光进行精确建模，是成像过程模拟中重要的一部分。
+
+> 相机捕获光，胶片利用传感器测量光，并最终成像，对此成像过程的模拟很重要
+
+最后，pbrt的所有相机模型都用到了Film类的实例，此类定义了相关类的基本接口，代表了各种相机捕获的图像。在本章中我们会介绍两种胶片的实现类。二者都是用PixelSensor类来为特定胶片或数码图像传感器的光谱响应进行建模。胶片和传感器的类会在本章最后一节介绍
+
+> 本章关键点就在Camera类和Film类，其中Camera类含有Film类的实例，Film类用PixelSensor来对成像过程进行建模
+>
+> 总结: 图像要真，就要模拟相机镜片造成的畸变效果，pbrt里，相机抽象为Camera类，负责模拟相机光的捕获和成像过程，其持有Film类的实例，Film类负责成像过程的模拟，其又通过PixelSensor模拟光辐射量的测量
 
 ## 5.1 相机接口
 
-Camera类继承自TaggedPointer
+Camera类使用基于TaggedPointer的方式来把接口中的方法调用，根据具体的相机类型，动态分派给正确的实现类。(详见附录，此处略)，Camera接口在文件base/camera.h中定义
 
 > TaggedPointer简单来讲是为了减少C++多态时虚表的内存开销(特别是复杂场景的渲染时，虚表会导致内存占用大)，并让同一个函数同时支持GPU和CPU的调用(代码在CPU和GPU运行时，函数存储在内存中不同的位置)
 
 ```c++
-class Camera : public TaggedPointer<PerspectiveCamera,OrthographicCamera,
+<<Camera Definition>>= 
+class Camera : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
                                     SphericalCamera, RealisticCamera> {
   public:
+    <<Camera Interface>> 
+};
+```
 
-    /*
-        必须实现的方法，用于对应图像采样的光线的计算，返回的光线需要归一化
-        若给定的CameraSample对象由于一些原因没有有效的光线，那么pstd::optional中的返回值需要被重置。
-        传入进来的SampleWavelengths(采样波长)不是常量引用，故相机就可以模拟镜头的色散效果，在这种情况下，光线只追踪单一波长的光，并且 GenerateRay() 方法将调用 SampledWavelengths::TerminateSecondar()
-        传入到此函数的CameraSample结构体，包含了相机光线需要的所有样本值。
-    */
-    PBRT_CPU_GPU inline pstd::optional<CameraRay> GenerateRay(
-        CameraSample sample, SampledWavelengths &lambda) const;
+相机类必须实现的首个方法就是GenerateRay(),此方法根据给定的图像样本计算并生成光线。返回的光线向量需要做归一化，因为系统中其他部分会用到此归一化的向量。对于给定的CameraSample，若由于某些原因没有可用的光线，那么pstd::optional返回未设置状态的值。光线对应的SampledWavelengths作为一个非常量引用来传入，以便各种相机可以对它们各自的畸变效果进行建模，在这种场景下，只会对光线的单个波长进行追踪，并且GenerateRay()方法会调用SampledWavelengths::TerminateSecondary()
 
-    /*
-        相机必须提供此方法的实现，这个方法不仅会类似GenerateRay()计算主光线，
-        还会计算位于胶片沿x,y方向上移动一个像素的微分光线，
-        用来代表特定相机光线的采样所对应的胶片的区域大小，
-        用于计算抗锯齿时的纹理查找，提高图像质量
-    */
-    PBRT_CPU_GPU
-    pstd::optional<CameraRayDifferential> GenerateRayDifferential(
-        CameraSample sample, SampledWavelengths &lambda) const;
+```c++
+<<Camera Interface>>= 
+pstd::optional<CameraRay> GenerateRay(CameraSample sample,
+                                      SampledWavelengths &lambda) const;
+```
 
-    /*
-        相机的实现必须提供对应Film(胶片)的访问实现，用于获知诸如输出的图片的分辨率等信息
-    */
-    PBRT_CPU_GPU inline Film GetFilm() const;
+传入GenerateRay()的CameraSample结构体有定义相机光线时需要的所有样本值。其成员中:
 
-    /*
-        模拟现实相机的快门效果，让胶片暴露在光中一小段时间。若此值不为0，会有动态模糊效果
-        相对于相机有移动的物体会被模糊
-        可以根据快门开关之间的时间内的光分布情况，利用蒙特卡洛积分和点采样方法，可以得到动态模糊的效果
+- pFilm: 胶片上的点，对应就是生成出来的光线的原点，这条光线带着辐射量
+- pLens: 这条光线穿过镜片时，经过镜片上的点
+- time: 光线采样的时长,若相机本身正在运动，time的值决定了当相机光线生成时，相机的具体位置
+- filterWeight: 当光线的幅射量被加到胶片存储的图像时，会使用此变量作为辐射量缩放因子，此因子在图像重建中，用于对各个像素点进行图像样本的滤波。详见5.4.3和8.8
 
-        此接口用一个在[0,1)间随机均匀分布的样本u，对应到快门的开启时间点，一般来讲
-        只是用来在快门开启和关闭时间里进行线性插值，使动态模糊更真实
-    */
-    PBRT_CPU_GPU inline Float SampleTime(Float u) const;
+```c++
+<<CameraSample Definition>>= 
+struct CameraSample {
+    Point2f pFilm;
+    Point2f pLens;
+    Float time = 0;
+    Float filterWeight = 1;
+};
+```
 
-    /*
-        允许相机设置ImageMetadata对象的参数，比如相机的转换矩阵等，若输出的图片的格式支持存储这些额外的信息，那么这些信息会被写入到最终图像里
-    */
-    void InitMetadata(ImageMetadata *metadata) const;
+GenerateRay()返回的CameraRay结构体，包含了这个光线ray, 及其光谱权重weight。比较简单的相机模型权重默认是1
 
-    /*
-        Camera接口的实现类必须使CameraTransform类可以用于其他坐标空间
-    */
-    PBRT_CPU_GPU inline const CameraTransform &GetCameraTransform() const;
-}
+```c++
+<<CameraRay Definition>>= 
+struct CameraRay {
+    Ray ray;
+    SampledSpectrum weight = SampledSpectrum(1);
+};
+```
+
+相机的实现类同时也必须提供GenerateRayDifferential()的实现，此方法不单像GenerateRay()那样计算并生成主光线，还为在胶片平面上的像素点生成在x,y方向偏移一个像素距离的光线。这些光线代表了相机光线在胶片位置的上的变化量，为系统中的其他部分提供有用的信息(某个特定相机光线的样本，表示多少胶片面积), 此信息对于纹理查找时的反走样处理会很有用
+
+```c++
+<<Camera Interface>>+=  
+pstd::optional<CameraRayDifferential> GenerateRayDifferential(
+    CameraSample sample, SampledWavelengths &lambda) const;
+```
+
+GenerateRayDifferential()返回CameraRayDifferential结构体的实例，与CameraRay基本等同，只是其存储的是RayDifferential实例
+
+```c++
+<<CameraRayDifferential Definition>>= 
+struct CameraRayDifferential {
+    RayDifferential ray;
+    SampledSpectrum weight = SampledSpectrum(1);
+};
+```
+
+Camera的实现必须能够访问其Film，方便系统其他部分使用，比如获取输出图像的分辨率等
+
+```c++
+<<Camera Interface>>+=  
+Film GetFilm() const;
+```
+
+就如现实世界中的各种相机那样，pbrt的相机模型也包含了快门的概念，快门会在短时间内打开，以便把胶片暴露给光。若此值不为0,则代表有曝光时间，会带来动态模糊(motion blur)效果。在曝光时间内，与相机有关的运动中的物体会变模糊。时间也是按照点来采样的，并且也遵从蒙特卡洛积分，即给定一个合适的光线的(快门)采样时间，可以计算出图像的动态模糊效果
+
+SampleTime()接口，在相机快门打开时，利用[0,1)间的均匀随机采样u，映射为采样时间。一般来讲，就是在快门打开和关闭的时间内做线性插值
+
+```c++
+<<Camera Interface>>+=  
+Float SampleTime(Float u) const;
+```
+
+最后一个接口可让相机的实现类设置ImageMetadata类里的字段，用来定义与相机相关的转换矩阵。若输出的图片格式支持存储这些额外信息，那么这些信息将会在与最终图片一并写入磁盘
+
+```c++
+<<Camera Interface>>+=  
+void InitMetadata(ImageMetadata *metadata) const;
 ```
 
 ### 5.1.1 相机的坐标空间
 
-除了世界空间外，还有物体空间，相机空间，相机-世界空间，和渲染空间
+在正式开始介绍pbrt中的相机模型及实现之前，我们会为所用到的一些坐标空间进行定义。除了在3.1章节中介绍过的世界空间外，现在我们将会介绍额外四种坐标空间：物体空间，相机空间，相机-世界空间，和渲染空间，总结如下:
 
-- 物体空间： 几何图元定义所在的坐标系统，比如，在pbrt中，球体圆心就在物体空间的坐标原点
-- 世界空间： 所有物体摆放在一个世界空间里，需要把物体从物体空间坐标转换为世界空间的坐标，世界空间是其他空间的标准框架。
-- 相机空间： 相机被放置于世界空间的某一点，有一个观察方向和摆放的朝向，相机的位置看成坐标原点，这个坐标系的z轴对应观察方向，y轴对应相机摆放的向上的方向
-- 相机-世界空间： 类似相机空间，这个坐标系的原点是相机的位置，但是保持了世界空间的方向，相机不一定沿着z轴观察
-- 渲染空间： 场景根据渲染需求做了坐标系转换，在pbrt中，可以是世界空间，相机空间，或是相机-世界空间
+- **物体空间**： 几何图元的定义所基于的坐标系统，比如，pbrt中的球体，圆心就在物体空间的坐标原点
+- **世界空间**： 虽然每个图元都有各自的物体空间，但场景中所有的物体是根据一个世界空间来摆放的。每个物体在世界空间中的位置，由一个"物体到世界"的变换来确定。世界空间是其他空间定义的基本依据
+- **相机空间**： 相机以特定观察方向和朝向放置于世界空间的某个点上。此相机所在的点定义了一个新的坐标系的原点，这个新坐标系的z轴对应观察方向，y轴对应相机指向"上"的方向
+- **相机-世界空间**： 与相机空间类似，此坐标系的原点即相机位置点，但是坐标轴朝向与世界空间下的坐标轴一致(就是说，与相机空间不同点就是此处的坐标空间不一定看向z轴方向)
+- **渲染空间**： 即渲染时，场景需要变换的目标坐标系，在pbrt中，可以是世界空间，相机空间，或是相机-世界空间
 
-> 相机空间中，坐标系原点在相机位置，三个轴根据相机移动和转动变化，相机-世界空间中，坐标原点在相机位置，但是三个轴方向与世界空间一致
+基于光栅化的渲染器中，传统上大部分计算都是基于相机空间的：在投影到屏幕并光栅化前，三角形的顶点都会从物体空间转换到相机空间。在此场景下，哪些物体可能被相机看到会很容易判断。比如，若一个物体的整个相机空间包围盒是在z=0平面背后的(且相机视场角不超过180度)，物体将不可见
 
-基于光栅化的渲染中，传统上都是在相机空间中进行各种计算，三角形的顶点坐标，在投影到屏幕和光栅化前，会从物体空间中全部转换到相机空间中，方便判断哪些物体能被相机看到。
+不同的是，许多光线追踪器(包括旧版pbrt代码)是在世界空间上渲染。相机是基于相机空间来生成光线的，但是生成后会把这些光线转换到世界空间，并执行后续的求交和着色计算。由此产生的问题是，由于靠近原点的浮点数相对比远离远点的浮点数更精确，那么若相机放置于远离原点的位置，相机观察到的这部分场景，在表示上的精度就会不足。
 
-与此相对的是，许多光线追踪器(包括pbrt之前的版本)是在世界空间上渲染。当生成光线时，相机是在相机空间中实现的，但是这些相机会把那些需要求交和着色的光线，转换到世界空间中。这种方式存在一个问题，即转换过程中，离原点近的，精度高，远的精度低，若相机的位置离原点很远，这个相机看向的场景时呈现的图像就会存在误差。
+图5.1解释了在世界空间中渲染产生的精度问题，在图5.1(a)中，物体和相机都是用原始设定渲染的，在世界空间下，二者的位置都在每个坐标的±10范围内。在图5.1(b)中，相机和场景在每个维度上都移动了1000000个单位。理论上，两张图片应该是一样的，但是第二张图片明显精度低很多，在这个几何模型体上，可看到浮点数导致的离散的边界
 
-> 若相机和场景离原点过远，相机空间到世界空间的转换过程的浮点数造成的误差会导致图像失真
+> 在光线追踪中，若基于世界空间渲染，会导致一个问题：若相机和物体若离世界空间的坐标太远，那么图像渲染出来可能是撕裂的
 
-在相机空间中渲染，对于离相机最近的物体，由于没有了相机空间到世界空间的转换过程，能原生提供最大的浮点计算精确度。但是在光线追踪中，这样做有个问题。场景一般会把主要特征沿着坐标轴建模(比如建筑物模型的地板和天花板可能就是对齐y轴的)，轴对称包围盒在这种情况下会退化得只剩一个维度，这样就减小了包围盒的表面积。
+在相机空间中渲染，由于此场景下物体是最靠近相机的，天然提供了最大的浮点精确度。若图5.1是在相机空间中渲染的，若把相机和场景中的几何体都平移1000000单位，就不会有撕裂效果，因为平移(带来的位置变化)被消除了。然而，若光线追踪使用相机空间渲染，会有问题。因为场景一般是以轴对齐的方式建模的(比如建筑物模型，地板和天花板很可能与y平面对齐)。此种情况下轴对齐的包围盒就退化为一个维度，因此减少了模型表面的面积。类似将在第七章介绍的BVH加速结构对此种包围盒会特别有效。反之，若相机相对于场景做旋转，轴对齐的包围盒就不那么有效了，渲染性能就会降低，对于图5.1的场景，渲染时间会增加27%
 
-类似BVH的加速结构会在第七章介绍，在这种包围盒下影响比较大，若相机在这样的场景中旋转，轴对称包围盒的包围效果就不好，会影响渲染性能。
+> 相机空间下做光追渲染，由于模型本身，和其包围盒一般是与坐标轴对齐的，旋转相机会导致相机空间的坐标系也转动，那么场景里的模型的包围盒在这个坐标系下就不是与相机空间的坐标系轴对齐的，类似BVH这样的求交加速结构效率就低，最终导致渲染性能降低
 
-> 轴对称包围盒(AABB): 一个矩形框，其边与坐标轴平行，用于包围三维空间中的物体。它是最小的矩形体积，可以包含所有物体的顶点
->
-> 个人理解：由于模型建模时为了方便，会把模型的主要特征，沿着坐标轴方向建模(比如高楼的高度会沿着y轴方向向上建模)。在相机空间中，由于坐标系根据相机的观察方式做了转换，模型在这个空间里可能就是“歪着的”，用轴对称包围盒这样的方式去包裹，会造成盒子空出来的空间通常比世界空间下的要大，在光线求交时，增加了大量本来不会相交的点的判断，影响了性能
-
-使用相机-世界空间来渲染会更好，相机是在坐标原点，场景坐标也被相应转换，然而，转动相机不会影响场景的几何坐标点，因此加速结构的包围盒还是很有效。使用相机-世界空间，不会有更快的渲染速度或更精确的渲染结果。
-
-CameraTransform类抽象了在各个空间之间的坐标系转换过程,这个类维护了两类转换，从相机空间到渲染空间的转换，和从渲染空间到世界空间的转换。在pbrt中，后者的转换不能动画化，所有动画都是用相机空间来转换，这是为了保证移动相机时，不会造成场景中静态物体也需要动态化，这会造成性能损失。
-
-> 移动相机不会造成性能损失，但是移动物体由于会导致包围盒变大，会降低加速结构的效率，所以要避免物体不必要的移动
+采用相机-世界空间来渲染可取二者之长，相机位于这个空间的原点，并且场景随着相机的位置对应做了平移。然而，相机的旋转则不会应用到场景中的几何体上，因此加速结构的包围盒的效果还是好的。采用相机-世界空间，不会增加渲染时间，并且同时保证了精度。如图5.1c，CameraTransform类对渲染时使用的坐标系的选取过程做了抽象，其会处理各种坐标空间的变换细节。
 
 ```c++
-/*
-    封装各个坐标空间之间的转换过程
-    该类维护了两类转换：从相机空间到渲染空间，从渲染空间到世界空间
-    Camera的实现类必须使此类支持其他系统的坐标空间
-*/
-/*
-    传入相机到世界空间转换后的对象，根据配置里渲染基于的渲染空间做转换
-    默认的渲染空间是相机-世界空间，但是也可以在命令行里面配置成其他空间
-*/
-CameraTransform::CameraTransform(const AnimatedTransform &worldFromCamera) {
-    switch (Options->renderingSpace) {
-    case RenderingCoordinateSystem::Camera: {
-        // <<对于相机空间的渲染，计算worldFromRender>>
-
-        /*
-            对于相机空间的渲染，从相机到世界空间的转换过程会被worldFromRender使用
-            对于从相机空间到渲染空间的变换过程，用了恒等变换(identity transformation),
-            故这两个坐标系统是等价的。
-            由于worldFromRender是不能被动画化，所以取了动画帧时间的中点(tMid)，然后
-            把这个点在相机变换中的动画，并入renderFromCamera
-        */
-        Float tMid = (worldFromCamera.startTime + worldFromCamera.endTime) / 2;
-        worldFromRender = worldFromCamera.Interpolate(tMid);
-        break;
-    }
-    case RenderingCoordinateSystem::CameraWorld: {
-        // <<对于相机-世界空间的渲染，计算worldFromRender>>
-        /*
-            对于相机-世界空间上的渲染(默认)，渲染空间到世界空间的坐标系变换时基于动画帧
-            的中点来转换到相机的位置
-        */
-        Float tMid = (worldFromCamera.startTime + worldFromCamera.endTime) / 2;
-        Point3f pCamera = worldFromCamera(Point3f(0, 0, 0), tMid);
-        worldFromRender = Translate(Vector3f(pCamera));
-        break;
-    }
-    case RenderingCoordinateSystem::World: {
-        // <<对于世界空间的渲染，计算worldFromRender>>
-        /*
-            对于世界空间的渲染，就是做恒等变换
-        */
-        worldFromRender = Transform();
-        break;
-    }
-    default:
-        LOG_FATAL("Unhandled rendering coordinate space");
-    }
-    LOG_VERBOSE("World-space position: %s", worldFromRender(Point3f(0, 0, 0)));
-    // <<计算renderFromCamera>>
-    /*
-        一旦worldFromRender设置完后，worldFromCamera剩余的变换过程会在这里处理，
-        存入到renderFromCamera
-    */
-    Transform renderFromWorld = Inverse(worldFromRender);
-    Transform rfc[2] = {renderFromWorld * worldFromCamera.startTransform,
-                        renderFromWorld * worldFromCamera.endTransform};
-    renderFromCamera = AnimatedTransform(rfc[0], worldFromCamera.startTime, rfc[1],
-                                         worldFromCamera.endTime);
-}
-```
-
-### 5.1.2 CameraBase类
-
-Camera接口的通用函数放到CameraBase中，其他相机类皆继承此类。关于camera的实现的相机类都放在cameras.h下面
-
-CameraBase类如下:
-
-```c++
-/*
-    camera接口的通用功能实现在此，所有camera实现须继承此类
-*/
-class CameraBase {
+<<CameraTransform Definition>>= 
+class CameraTransform {
   public:
-    // CameraBase Public Methods
-    PBRT_CPU_GPU
-    Film GetFilm() const { return film; }
-    PBRT_CPU_GPU
-    const CameraTransform &GetCameraTransform() const { return cameraTransform; }
-
-    PBRT_CPU_GPU
-    Float SampleTime(Float u) const { return Lerp(u, shutterOpen, shutterClose); }
-
-    void InitMetadata(ImageMetadata *metadata) const;
-    std::string ToString() const;
-
-    PBRT_CPU_GPU
-    void Approximate_dp_dxy(Point3f p, Normal3f n, Float time, int samplesPerPixel,
-                            Vector3f *dpdx, Vector3f *dpdy) const {
-        // Compute tangent plane equation for ray differential intersections
-        Point3f pCamera = CameraFromRender(p, time);
-        Transform DownZFromCamera =
-            RotateFromTo(Normalize(Vector3f(pCamera)), Vector3f(0, 0, 1));
-        Point3f pDownZ = DownZFromCamera(pCamera);
-        Normal3f nDownZ = DownZFromCamera(CameraFromRender(n, time));
-        Float d = nDownZ.z * pDownZ.z;
-
-        // Find intersection points for approximated camera differential rays
-        Ray xRay(Point3f(0, 0, 0) + minPosDifferentialX,
-                 Vector3f(0, 0, 1) + minDirDifferentialX);
-        Float tx = -(Dot(nDownZ, Vector3f(xRay.o)) - d) / Dot(nDownZ, xRay.d);
-        Ray yRay(Point3f(0, 0, 0) + minPosDifferentialY,
-                 Vector3f(0, 0, 1) + minDirDifferentialY);
-        Float ty = -(Dot(nDownZ, Vector3f(yRay.o)) - d) / Dot(nDownZ, yRay.d);
-        Point3f px = xRay(tx), py = yRay(ty);
-
-        // Estimate $\dpdx$ and $\dpdy$ in tangent plane at intersection point
-        Float sppScale =
-            GetOptions().disablePixelJitter
-                ? 1
-                : std::max<Float>(.125, 1 / std::sqrt((Float)samplesPerPixel));
-        *dpdx =
-            sppScale * RenderFromCamera(DownZFromCamera.ApplyInverse(px - pDownZ), time);
-        *dpdy =
-            sppScale * RenderFromCamera(DownZFromCamera.ApplyInverse(py - pDownZ), time);
-    }
-
-  protected:
-    // CameraBase Protected Members
-    CameraTransform cameraTransform;
-    Float shutterOpen, shutterClose;
-    Film film;
-    Medium medium;
-    Vector3f minPosDifferentialX, minPosDifferentialY;
-    Vector3f minDirDifferentialX, minDirDifferentialY;
-
-    // CameraBase Protected Methods
-    CameraBase() = default;
-
-    CameraBase(CameraBaseParameters p);
-
-    /*
-        通过多次调用camera的GenerateRay()函数来计算光线的微分量
-
-        camera的实现类必须实现此函数，但是那些方法之后还是会调用此函数
-        (注意，函数的签名不同于实现类中的那个)
-
-        相机的各种实现类会传入this指针(camera入参)，这会允许此函数调用对应camera的
-        GenerateRay()函数。这种额外复杂性的引入是由于我们没在camera接口使用虚函数，
-        这意味着CameraBase类需要有camera传入才能调用GenerateRay()方法
-    */
-    PBRT_CPU_GPU
-    static pstd::optional<CameraRayDifferential> GenerateRayDifferential(
-        Camera camera, CameraSample sample, SampledWavelengths &lambda);
+    <<CameraTransform Public Methods>> 
+  private:
+    <<CameraTransform Private Members>> 
 };
 ```
 
-CameraBase的构造器参数如下:
+Camera的实现类必须使其CameraTransform对系统其他部分可用，故我们会在Camera接口中新增一个方法
 
 ```c++
-/*
-    CameraTransForm: 最重要的类，把相机坐标变换成场景所用的坐标
-    
-    shutterOpen, shutterClose: 快门的开关时间
+<<Camera Interface>>+=  
+const CameraTransform &GetCameraTransform() const;
+```
 
-    Film: 存储最终图像，且模拟了胶片的感光器
+CameraTransform类维护了两种变换，其一是把相机空间变换到渲染空间，其二是把渲染空间变换到世界空间。在pbrt中，后者的变换时，(相机)不可是动画化的，在相机变换过程中的任何动画会保持第一种变换(的)。这保证了正在移动的相机不会导致场景中的静态几何体也变成动画化，而造成性能损失
 
-    Medium: 相机要考虑的介质
-*/
+```c++
+<<CameraTransform Private Members>>= 
+AnimatedTransform renderFromCamera;
+Transform worldFromRender;
+```
+
+CameraTransform的构造器取定义与场景描述文件中的"从相机到世界空间"的变换，并把其分成之前提到的两个变换。默认的渲染空间是相机-世界空间，然而，渲染空间的选择可利用命令行选项来覆盖
+
+```c++
+<<CameraTransform Method Definitions>>= 
+CameraTransform::CameraTransform(const AnimatedTransform &worldFromCamera) {
+    switch (Options->renderingSpace) {
+    case RenderingCoordinateSystem::Camera: {
+        <<Compute worldFromRender for camera-space rendering>> 
+    } case RenderingCoordinateSystem::CameraWorld: {
+        <<Compute worldFromRender for camera-world space rendering>> 
+    } case RenderingCoordinateSystem::World: {
+        <<Compute worldFromRender for world-space rendering>> 
+    }
+    }
+    <<Compute renderFromCamera transformation>> 
+       Transform renderFromWorld = Inverse(worldFromRender);
+       Transform rfc[2] = { renderFromWorld * worldFromCamera.startTransform,
+                            renderFromWorld * worldFromCamera.endTransform };
+       renderFromCamera = AnimatedTransform(rfc[0], worldFromCamera.startTime,
+                                            rfc[1], worldFromCamera.endTime);
+
+}
+```
+
+当用相机空间渲染时，在worldFromRender会用worldFromCamera的变换来赋值；并且，对于renderFromCamera的变换，会用一个单位变换来完成，因为这两个坐标系是等价的。然而，由于worldFromRender无法动画化，其实现会取worldFromCamera会取帧的中点，然后把相机变换中的任何动画效果，和并入到renderFromCamera中
+
+```c++
+<<Compute worldFromRender for camera-space rendering>>= 
+Float tMid = (worldFromCamera.startTime + worldFromCamera.endTime) / 2;
+worldFromRender = worldFromCamera.Interpolate(tMid);
+break;
+```
+
+对于默认的相机-世界空间下的渲染，worldFromRender的变换是由相机的位置在帧的中点处平移得到的
+
+```c++
+<<Compute worldFromRender for camera-world space rendering>>= 
+Float tMid = (worldFromCamera.startTime + worldFromCamera.endTime) / 2;
+Point3f pCamera = worldFromCamera(Point3f(0, 0, 0), tMid);
+worldFromRender = Translate(Vector3f(pCamera));
+break;
+```
+
+对于世界空间渲染，worldFromRender就是单位变换
+
+```c++
+<<Compute worldFromRender for world-space rendering>>= 
+worldFromRender = Transform();
+break;
+```
+
+一旦worldFromRender设置好后，在worldFromCamera中剩余的变换都会被解出并存储于renderFromCamera
+
+```c++
+<<Compute renderFromCamera transformation>>= 
+Transform renderFromWorld = Inverse(worldFromRender);
+Transform rfc[2] = { renderFromWorld * worldFromCamera.startTransform,
+                     renderFromWorld * worldFromCamera.endTransform };
+renderFromCamera = AnimatedTransform(rfc[0], worldFromCamera.startTime,
+                                     rfc[1], worldFromCamera.endTime);
+```
+
+CameraTransform类提供了叫RenderFromCamera(),CameraFromRender()和RenderFromWorld()的各种重载方法，用来把点，向量，法线和射线在其管理的各个坐标系之间做变换。其他方法直接返回了对应的变换，在此就不详述
+
+### 5.1.2 CameraBase类
+
+本章中所有的相机实现类都共享一些通用的函数，我们将其重构到了单个类中，即CameraBase,所有相机实现类皆继承此类。CameraBase及其所有实现类，都定义于文件cameras.h和cameras.cpp中
+
+```c++
+<<CameraBase Definition>>= 
+class CameraBase {
+  public:
+    <<CameraBase Public Methods>> 
+  protected:
+    <<CameraBase Protected Members>> 
+    <<CameraBase Protected Methods>> 
+};
+```
+
+CameraBase的构造器会取在所有pbrt的相机类中都可能用到的各种参数:
+
+- 最重要的一个参数，是把相机放置在场景中的变换，以CameraTransform来表示，储存于cameraTransform的成员变量中
+- 其次是一组浮点数，用来给出相机快门开关的时间
+- Film的实例，此类存储了最终图像，并且对胶片传感器进行建模
+- 最后是Medium实例，代表了相机基于的散射介质(若有)(Medium类在11.4章节进行介绍)
+
+下方是一个小结构体，此结构体把这些参数绑定在一起，可为Camera的构造器缩短参数列表长度
+
+```c++
+<<CameraBaseParameters Definition>>= 
 struct CameraBaseParameters {
     CameraTransform cameraTransform;
     Float shutterOpen = 0, shutterClose = 1;
     Film film;
     Medium medium;
-    CameraBaseParameters() = default;
-    CameraBaseParameters(const CameraTransform &cameraTransform, Film film, Medium medium,
-                         const ParameterDictionary &parameters, const FileLoc *loc);
 };
 ```
 
-## 5.2 投影相机的模型
+我们会只在此处包含构造器的原型，因为其实现只是对其成员变量进行赋值
+
+```c++
+<<CameraBase Protected Methods>>= 
+CameraBase(CameraBaseParameters p);
+
+
+<<CameraBase Protected Members>>= 
+CameraTransform cameraTransform;
+Float shutterOpen, shutterClose;
+Film film;
+Medium medium;
+```
+
+CameraBase类能直接实现Camera接口要求的许多方法，因此节省了继承此类的camera实现类中，多余实现的麻烦
+
+比如，此类有Film和CameraTransform的访问方法
+
+```c++
+<<CameraBase Public Methods>>= 
+Film GetFilm() const { return film; }
+const CameraTransform &GetCameraTransform() const {
+    return cameraTransform;
+}
+```
+
+SampleTime()方法是利用样本的u值，在快门开关时间之间以线性插值法实现
+
+```c++
+<<CameraBase Public Methods>>+=  
+Float SampleTime(Float u) const {
+    return Lerp(u, shutterOpen, shutterClose);
+}
+```
+
+CameraBase提供了一个GenerateRayDifferential()方法，此方法通过多次调用camera接口的GenerateRay()来实现。这里有一个细节，使用此方法的相机实现类还是必须自己实现一个Camera接口的GenerateRayDifferential()方法，但是之后可以在各自的实现里来调用此方法(注意，此方法的函数签名跟camera接口里那个同名方法不同)相机的实现类把它们的指针作为Camera参数的指针传入，这就可以调用相机的GenerateRay()方法了。这种额外的复杂度引入是由于我们在相机接口没有使用虚函数导致的，这意味着CameraBase类本身不具有调用那个方法的能力，除非某个相机类提供了此方法的实现
+
+```c++
+<<CameraBase Method Definitions>>= 
+pstd::optional<CameraRayDifferential>
+CameraBase::GenerateRayDifferential(Camera camera,
+        CameraSample sample, SampledWavelengths &lambda) {
+    <<Generate regular camera ray cr for ray differential>> 
+    <<Find camera ray after shifting one pixel in the  direction>> 
+    <<Find camera ray after shifting one pixel in the  direction>> 
+    <<Return approximate ray differential and weight>> 
+}
+```
+
+主光线会在第一次调用GenerateRay()时被找到。若对于给定的样本没有可用的光线，那么也不会有对应的微分光线
+
+```c++
+<<Generate regular camera ray cr for ray differential>>= 
+pstd::optional<CameraRay> cr = camera.GenerateRay(sample, lambda);
+if (!cr) return {};
+RayDifferential rd(cr->ray);
+```
+
+为了找到x方向的微分光线，会有两次尝试，一次向前差分，一次向后差分，差分量是像素的一小部分。这两次尝试对于真实感相机模型中图像边缘的光晕(vignetting)效果时很重要的。有时，主光线是存在的，但是在某个方向的移动会超出镜片系统的成像范围，这种情况下，尝试另一个方向就可能成功生成光线
+
+```c++
+<<Find camera ray after shifting one pixel in the x direction>>= 
+pstd::optional<CameraRay> rx;
+for (Float eps : {.05f, -.05f}) {
+    CameraSample sshift = sample;
+    sshift.pFilm.x += eps;
+    <<Try to generate ray with sshift and compute x differential>> 
+}
+```
+
+生成x的辅助射线也是可能的，那么就可通过差分来初始化对应的像素宽的微分量
+
+```c++
+<<Try to generate ray with sshift and compute  differential>>= 
+if (rx = camera.GenerateRay(sshift, lambda); rx) {
+    rd.rxOrigin = rd.o + (rx->ray.o - rd.o) / eps;
+    rd.rxDirection = rd.d + (rx->ray.d - rd.d) / eps;
+    break;
+}
+```
+
+对于\<\<Find camera ray after shifting one pixel in the y direction\>\>这个代码片段的实现，与上文类似，此处略过
+
+若x,y的射线都被找到，我们就能继续，并且把hasDifferentials设置为true。否则，主光线仍然能被追踪，只是没有可用的微分量
+
+```c++
+<<Return approximate ray differential and weight>>= 
+rd.hasDifferentials = rx && ry;
+return CameraRayDifferential{rd, cr->weight};
+```
+
+最终，为了让其子类更加便利，CameraBase提供了使用CameraTransform类的各种变换方法。此处只写了Ray的变换方法，其他方法也是类似的
+
+```c++
+<<CameraBase Protected Methods>>+= 
+Ray RenderFromCamera(const Ray &r) const {
+    return cameraTransform.RenderFromCamera(r);
+}
+```
+
+## 5.2 投影相机模型
 
 三维空间下的观察问题在三维图形学下是最基本的问题之一，即，如何把3D场景展示在二维图像上。最经典的解决方法是用$4\times 4$矩阵来实现。因此，我们会介绍一个投影矩阵的相机类，叫ProjectiveCamera，然后基于它，定义2个相机模型。第一个实现是正交投影，另一个实现是透视投影，这两种是最经典和广泛运用的投影类型。
 
@@ -508,13 +603,11 @@ if (lensRadius > 0) {
 
 理想化的针孔相机只允许光线通过单个点，然后到达胶片上，在现实是不可实现的。然而，让相机拥有极小的光圈是可行的，小的光圈允许相对更少的光照射到胶片感光器上，在这种场景下，需要更长时间的光照来捕获足够的光子来精确的拍到图像，代价是，当物体在快门打开的期间移动，会导致物体模糊。
 
-真实的相机有镜头系统，会把光聚焦在一个有限尺寸下的光圈中，光线穿过此光圈照到胶片上。相机的设计师们(和摄影师们利用可调节大小的光圈)面临一个抉择：光圈越大，照射到胶片上的光越多，需要曝光的时间就越短。然而，镜头只能聚焦在单个平面上(焦距面)，离这个平面距离越远的物体，就越模糊，越大的光圈，这个效应越明显。
+真实的相机有镜片系统，会把光聚焦在一个有限尺寸下的光圈中，光线穿过此光圈照到胶片上。相机的设计师们(和摄影师们利用可调节大小的光圈)面临一个抉择：光圈越大，照射到胶片上的光越多，需要曝光的时间就越短。然而，镜头只能聚焦在单个平面上(焦距面)，离这个平面距离越远的物体，就越模糊，越大的光圈，这个效应越明显。
 
 RealisticCamera类实现了一个对真实镜头系统的很精确的模拟。对于我们之前介绍的简单的相机模型来说，我们能应用一个经典的的光学近似方法，即薄透镜近似法，这种近似法利用传统计算机图形学投影模型，来对有限光圈的效应做建模。薄透镜近似法用一个球形轮廓的镜片的光学系统来建模，此透镜的厚度相对于镜片的曲率半径要小
 
 在薄透镜近似法下，与光轴相平行的入射光会穿过透镜，并聚焦于透镜后的一点，这个点叫焦点。焦点到透镜的距离f叫焦距。如果胶片平面被安放在焦点处，那么无限远的物体会被聚焦，因为它们会在胶片上变成一个点
-
-接下来介绍了薄透镜原理和方程，初中物理知识
 
 ## 5.3 球形相机
 

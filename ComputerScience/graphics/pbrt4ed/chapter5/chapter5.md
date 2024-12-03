@@ -9,7 +9,7 @@
 > 镜片造成的图像畸变效果虽然本质是不期望发生的，但是也给人带来图像的真实感
 >
 > 枕形畸变: 画面向中心收缩，像个枕头
-> 
+>
 > 桶形畸变: 画面由中心膨胀，像个桶，与枕形畸变正好相反
 
 本章将从Camera接口的描述开始，之后会用小孔相机模型作为出发点，来介绍此接口的实现类
@@ -643,7 +643,7 @@ $$
 E(p)=\frac{1}{z^2}\int_{A_e}L_i(p,p')\vert\cos^4\theta\vert dA_e \tag{5.3}
 $$
 
-对局胶片范围比距离z相对较大的相机，$\cos \theta$项可以显著降低入射光辐照度，此项也会导致黑边现象。大部分现代数码相机利用预设的矫正因子来增加感光器边缘的像素值，纠正了此效果。
+对于胶片范围比距离z相对较大的相机，$\cos \theta$项可以显著降低入射光辐照度，此项也会导致黑边现象。大部分现代数码相机利用预设的矫正因子来增加感光器边缘的像素值，纠正了此效果。
 
 在快门打开的时间内，对胶片上某点的辐照度进行积分，可得出辐射曝光量，即是单位面积能量的辐射单位，$J/m^2$:
 
@@ -686,7 +686,7 @@ $$
 > 3. 多个感光器像素点最终通过解马赛克算法合成一个图像像素点的颜色，也就是多个感光器像素点对应图像中一个像素点
 > 4. 在马赛克分布里，感光器的像素点的位置不是均匀的，分布方式有好几种，具体请查阅资料
 
-设计数码感光器有诸多挑战，大部分挑战是来自像素点的尺寸需要极小，因为图像需要高分辨率。像素点越小，打到其上的光子越少，导致精确衡量光照量就越难。像素阵列也会遭遇各种类型的噪声，其中，散粒噪声(shot noise)是最主要的一种，这种噪声是由于光子的离散性导致的：捕获到的光子中有一些随机扰动，会导致捕获到的光子一会多一会少。散粒噪声可以用泊松分布来建模
+设计数码感光器有诸多挑战，大部分挑战是来自像素点的尺寸需要极小，因为图像需要高分辨率。像素点越小，打到其上的光子越少，导致精确衡量光照量就越难。像素阵列也会遭遇各种类型的噪点，其中，散粒噪点(shot noise)是最主要的一种，这种噪点是由于光子的离散性导致的：捕获到的光子中有一些随机扰动，会导致捕获到的光子一会多一会少。散粒噪点可以用泊松分布来建模
 
 为了使传统胶片产生足够的化学反应，或者使光子被感光器充分捕获，每个像素必须接收到足够的光量。在方程5.5中，我们可知每个像素捕获的能量取决于入射光的光辐射量，像素面积，出瞳面积，和曝光时间。对于特定相机的实现，像素面积是固定的，为了增加光照而增加镜片光圈面积和曝光时间都可能导致非预期的副作用。更大的光圈减少了景深效应，这可能导致非预期的失焦模糊。更长的曝光时间也会由于场景中物体的运动或相机在快门开启的时候的运动导致模糊。感光器和胶片因此提供了在ISO配置下的额外控制。
 
@@ -788,13 +788,84 @@ static constexpr int nSwatchReflectances = 24;
 static Spectrum swatchReflectances[nSwatchReflectances];
 ```
 
-ProjectReflectance()工具方法为一个反射率取其光谱分布，并且有一个光照量，也还有三个光谱匹配函数$\bar{b_i}$对应三原色的颜色空间。这个方法返回一个三项式的相关系数$c_i$，由下式给出:
+ProjectReflectance()工具方法取某个反射率取其光谱分布，光照量，还有三个光谱匹配函数$\bar{b_i}$(对应某种三原色的颜色空间)。这个方法返回三个相关系数$c_i$，由下式给出:
 
 $$
 c_i = \int r(\lambda)L(\lambda)\bar{b_i}(\lambda)d\lambda
 $$
 
-r是光谱反射率函数，L是光照的光谱分布，$\bar{b_i}$是一个光谱匹配函数。在第二个匹配函数$\bar{b_2}$一般来说对应了亮度或者至少绿色的假设下，这个颜色在人类视觉系统中有最大的反馈。返回的颜色的三项是被$\int L(\lambda)\bar{b_2}(\lambda)d\lambda$归一化了。在这种方法下，线性最小二乘法的你和至少根据视觉的重要性粗略地对每对RGB/XYZ进行加权。
+r是光谱反射率函数，L是光照的光谱分布，$\bar{b_i}$是某个光谱匹配函数。在第二个匹配函数$\bar{b_2}$为流明(光照度)或至少为绿色的假设下(人眼最敏感的颜色)，返回的颜色的三个项，都会被$\int L(\lambda)\bar{b_2}(\lambda)d\lambda$归一化。在这种方法下，线性最小二乘法的拟合结果，至少是根据视觉上的重要程度粗略地对每对RGB/XYZ进行了加权的结果。
+
+ProjectReflectance()函数取三色类型的色彩空间作为模板参数，因此能够返回RGB或XYZ的值。其实现与Spectrum::InnerProduct()类似，以间隔1nm的波长来计算出黎曼和，此处略
+
+```c++
+<<PixelSensor Private Methods>>= 
+template <typename Triplet>
+static Triplet ProjectReflectance(Spectrum r, Spectrum illum,
+                                  Spectrum b1, Spectrum b2, Spectrum b3);
+```
+
+在输出色彩空间里计算XYZ相关因子的代码片段\<\<Compute xyzOutput values for training swatches\>\>中，大部分与RGB的类似，只是其输出的是光照量和XYZ光谱匹配函数，并且初始化了xyzOutput数组，此处略
+
+给出这两个颜色相关因子矩阵后，调用LinearLeastSquares()函数来解决公式5.7的优化问题
+
+```c++
+<<Initialize XYZFromSensorRGB using linear least squares>>= 
+pstd::optional<SquareMatrix<3>> m =
+    LinearLeastSquares(rgbCamera, xyzOutput, nSwatchReflectances);
+if (!m) ErrorExit("Sensor XYZ from RGB matrix could not be solved.");
+XYZFromSensorRGB = *m;
+```
+
+由于RGB和XYZ颜色是利用对应光照度的颜色空间来计算的，矩阵M也会进行白平衡
+
+```c++
+<<PixelSensor Public Members>>= 
+SquareMatrix<3> XYZFromSensorRGB;
+```
+
+PixelSensor的第二个构造器的光谱响应曲线使用了XYZ匹配函数。若某个特定相机传感器没有在场景描述文件中定义，默认就是用此构造。注意，此种亲口光下的成员变量r_bar,g_bar,b_bar实际代表的是X,Y,Z
+
+```c++
+<<PixelSensor Public Methods>>+=  
+PixelSensor(const RGBColorSpace *outputColorSpace, Spectrum sensorIllum,
+       Float imagingRatio, Allocator alloc)
+    : r_bar(&Spectra::X(), alloc), g_bar(&Spectra::Y(), alloc),
+      b_bar(&Spectra::Z(), alloc), imagingRatio(imagingRatio) {
+    <<Compute white balancing matrix for XYZ PixelSensor>> 
+}
+```
+
+默认情况下，当PixelSensor转换到XYZ相关系数时，是不会有白平衡的。这个过程是在后处理中完成。然而，若用户确实指定了某个色温，那么白平衡就会被XYZFromSensorRGB矩阵处理(否则其就是一个单位矩阵)。此处的WhiteBalance()函数简单介绍如下：其会取两种颜色空间中白色点的色度，然后返回一个矩阵，把第一种颜色空间映射到第二种颜色空间上。
+
+```c++
+<<Compute white balancing matrix for XYZ PixelSensor>>= 
+if (sensorIllum) {
+     Point2f sourceWhite = SpectrumToXYZ(sensorIllum).xy();
+     Point2f targetWhite = outputColorSpace->w;
+     XYZFromSensorRGB = WhiteBalance(sourceWhite, targetWhite);
+}
+```
+
+PixelSensor提供的主要函数是ToSensorRGB()，此函数把一个以点采样,且在某个SampledSpectrum中的的光谱分布$L(\lambda_i)$转换为在感应器颜色空间中的RGB相关因子。感应器的相应积分是根据公式5.6，通过蒙特卡洛法计算出来的。估计式形式如下:
+
+$$
+r \approx \frac{1}{n}\sum_i^n\frac{L(\lambda_i)\bar{r}(\lambda_i)}{p(\lambda_i)} \tag{5.8}
+$$
+
+此处的n等于NSpectrumSamples。对应的PDF值可从SampledWaveLengths取得，并且根据波长的总和然后除以n的操作是由SampledSpectrum::Average()方法处理。这些相关因子会被成像率缩放，最终完成转换过程
+
+```c++
+<<PixelSensor Public Methods>>+= 
+RGB ToSensorRGB(SampledSpectrum L,
+                const SampledWavelengths &lambda) const {
+    L = SafeDiv(L, lambda.PDF());
+    return imagingRatio *
+        RGB((r_bar.Sample(lambda) * L).Average(),
+            (g_bar.Sample(lambda) * L).Average(),
+            (b_bar.Sample(lambda) * L).Average());
+}
+```
 
 #### 色彩适应和白平衡
 

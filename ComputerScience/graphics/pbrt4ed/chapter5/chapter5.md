@@ -497,8 +497,6 @@ Transform Perspective(Float fov, Float n, Float f) {
     z'=\frac{f(z-n)}{z(f-n)}
     $$
 
-    > f: 相机焦距， n: 相机的近裁剪面
-
     所有的这些计算可以用$4 \times 4$的矩阵编码，这个矩阵可以用在齐次坐标上。
 
     $$

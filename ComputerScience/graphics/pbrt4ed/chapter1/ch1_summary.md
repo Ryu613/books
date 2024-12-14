@@ -44,15 +44,15 @@
     $$
     L_o(p, \omega_o) = L_e(p, \omega_o) + \int_{S^2}f(p, \omega_o,\omega_i)L_i(p,\omega_i)|\cos \theta_i|d\omega_i
     $$
-    > $L_o(p, \omega_o)$: 从p点沿$\omega_o$方向射出的光的辐射度(亮度)，这个$\omega_o$即从交点射向相机点的方向
+    > $L_o(p, \omega_o)$: 从p点沿$\omega_o$方向射出的光的辐射亮度(亮度)，这个$\omega_o$即从交点射向相机点的方向
     >
-    > $L_e(p, \omega_o)$: p点若自己是光源，要加上它自己的光辐射度
+    > $L_e(p, \omega_o)$: p点若自己是光源，要加上它自己的光辐射亮度
     >
     > $\int_{S^2}$: 表示从p点为球心所在的球面$S^2$上，要汇总所有入射光的光辐射
     >
     > $f(p, \omega_o,\omega_i)$: 这个就是BRDF函数，指从入射光方向$\omega_i$到出射方向$\omega_o$的光的反射辐射量是多少
     >
-    > $L_i(p,\omega_i)$: 光源入射到p点的辐射度
+    > $L_i(p,\omega_i)$: 光源入射到p点的辐射亮度
     >
     > $\vert \cos \theta_i\vert$: 入射光与p点法线的夹角的余弦，描述点p由于入射光照射角度影响p点能接收到多少$L_i(p,\omega_i)$的量，加绝对值是说大于90°角的场景取正
     >

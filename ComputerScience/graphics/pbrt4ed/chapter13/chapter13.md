@@ -573,4 +573,100 @@ ray = isect.SpawnRay(bs->wi);
 
 否则，就按照代码片段<<在(半)球面均匀采样以获取心得路径方向>>执行。这段代码比RandomWalkIntegrator更精细，比如：若表面会反射，但是不会透射，代码会确认采样的方向是根据光散射所在的半球面上的。我们不会在此包含这段代码片段，因为此片段必须处理一堆场景，没有太大必要关注其内部工作细节。
 
-## 13.4 更好的路径追踪
+## 13.4 更好的路径追踪器
+
+pathIntegrator与SimplePathIntegrator都基于相同的路径追踪方式，但是SimplePathIntegrator包含了多种优化。包括：
+
+- 直接光照的计算是同时基于BSDF采样和光源采样的，并且利用了多重重要性采样对二者进行加权。比起单独采样光照来说，此方法能显著减少方差
+- 可以使用任意LightSampler,以便支持类似BVHLightSampler这样的高效光照采样算法
+- 若提供了VisibleSurface，会把其初始化，此类可把首个交点的几何信息提供给Film的实现类(比如GBufferFilm)
+- 俄罗斯轮盘赌方法，用来中断路径，这样能够显著提高积分器的效率
+- 应用了一种叫做路径标准化的技术，以便减少那些难以采样到的路径的方差
+
+虽然这些额外的方法让实现变得更复杂，但是它们也能显著优化效率，二者的对比，见图13.7
+
+> 图中可看到，新的路径积分器MSE较简单路径积分器减少了1.97倍，执行时间也比后者快4.44倍，整体效率提高了8.75倍
+> 我看上去两个图，新的路径积分器的噪点确实有所不明显了，但是光照阴影和色彩上没有明显差距
+
+以上这些与SimplePathIntegrator的不同，最重要的是第一点，即直接光照的计算是如何被执行的。在SimplePathIntegrator中，某个光源以均匀的概率被选取，然后这个光源会采样一个方向，对应的估计式由方程13.9给出。更一般的来说，路径贡献的估计式能够根据一个任意方向的概率分布p来表达，这个估计式如下:
+
+$$
+P(\bar{p}_i) \approx \frac{L_e(\mathsf{p_i}\rightarrow \mathsf{p_{i-1}})f(\mathsf{p_i}\rightarrow \mathsf{p_{i-1}}\rightarrow \mathsf{p_{i-2}})\vert\cos\theta_i\vert V(\mathsf{p_i}\leftrightarrow \mathsf{p_{i-1}})}{p(\omega_i)} \beta
+$$
+
+从上可能看到，类似SimplePathIntegrator那样，只使用某个与$L_e$因子匹配的采样PDF来采样这些方向，可能是一种较好的策略。毕竟对于被采样的方向来说，辐射亮度$L_e$有望不为0。若我们利用BSDF的采样分布来取样本，我们可能选取到根本不与光源相交的方向，这会导致浪费了本来期望照到交点的光线追踪性能消耗，最终却得来0的辐射亮度。
+
+然而，某些情况下，以BSDF采样的方式也能成为更有效的策略。对于一个非常光滑的表面，某小部分方向上的BSDF非0。对光源采样不大可能找到从表面散射过来的，拥有明显效果的方向，特别是当光源很大且与物体离得很近时更是如此。更糟的是，当这样的光源样本恰好落在BSDF分布的那部分区域时，由于分子中的高贡献值和分母中的低PDF，会导致估计结果值很巨大，这种时候，即估计式会有很高的方差
+
+图13.8展示了各种情况，这些采样方法的每一种都比其他的好很多。在这个场景中，四个矩形表面从上到下，依次从非常光滑到非常粗糙，被从左至右依次变小的球形光源照到。图13.8a和13.8b展示了他们各自的BSDF和光采样方式。这些例子说明，当在某个较窄的方向范围(比从光源采样得到的方向小得多)具有较大值时，直接对BSDF进行采样会非常有效的。这个例子在大光源的左上方拥有低粗糙度的表面上是最明显的。另一方面，相反的场景下，当光源较小且BSDF的那部分更少集中时对光源采样，可以视为更有效的方式。(右下角最明显)
+
+![图13.8](img/fg13_8.png)
+
+图13.8：从上至下是四种依次从非常光滑到非常粗糙的表面，被从左往右渐小的球形光源照到，用不同的采样方式渲染。(a)BSDF采样，(b)光源采样 (c)使用MIS，两种方法结合。根据BSDF采样一般来说对于高度镜面化的材质且光源较大时是更有效的，因为光照是从多个方向照出，但BSDF值只在其中很小的部分较大(图中左上的反射情况)。相反，对于较小的光源和粗糙的材质(右下)，根据光源采样是更有效的
+
+从每种采样方法中取某个样本，并且估计式做平均化处理，那么带来的好处很有限。当其中某一种采样方式并不有效，且这种方式采样到了一个非零的贡献量时，估计式的结果还是会有高方差。
+
+因此，此种情况天然适用多重重要性采样。因为我们拥有多种采样方法，且其中的每个都在某些时候有效，有些时候不太有效。在PathIntegrator中就是用了此方法，包括了一个对光源的采样$\omega_1$ ~ $p_1$和一个对BSDF的采样$\omega_b$ ~ $p_b$, 得出估计式如下:
+
+$$
+P(\bar{p_i}) \approx \omega_1(\omega_1)\frac{L_e(\mathsf{p_1}\rightarrow \mathsf{p_{i-1}})f(\mathsf{p_1}\rightarrow \mathsf{p_{i-1}}\rightarrow \mathsf{p_{i-2}})\vert\cos\theta_i\vert V(\mathsf{p_1}\leftrightarrow \mathsf{p_{i-1}})}{p_1(\omega_1)}\beta +\\
+\omega_b(\omega_b)\frac{L_e(\mathsf{p_b}\rightarrow \mathsf{p_{i-1}})f(\mathsf{p_b}\rightarrow \mathsf{p_{i-1}}\rightarrow \mathsf{p_{i-2}})\vert\cos\theta_b\vert V(\mathsf{p_b}\leftrightarrow \mathsf{p_{i-1}})}{p_b(\omega_b)}\beta \tag{13.10}
+$$
+
+表面的交点对应的两个采样方向依次是$p_1$和$p_b$,且每一项包含了一个对应的多重重要性采样(MIS)的权重$\omega_1$或者$\omega_b$,这两个权重可被计算出来，例如，使用方程2.14中的平衡启发式，或者方程2.15中的指数启发式来计算。图13.8(c)展示了结合这两种采样方式的多重重要性采样的效果
+
+如前文所述，我们现在就能开始实现PathIntegrator,它是另一个RayIntegrator
+
+```c++
+<<PathIntegrator Definition>>= 
+class PathIntegrator : public RayIntegrator {
+  public:
+    <<PathIntegrator Public Methods>> 
+  private:
+    <<PathIntegrator Private Methods>> 
+    <<PathIntegrator Private Members>> 
+};
+```
+
+三个成员变量影响PathIntegrator的操作：一个最大路径深度，lightSampler光源采样器，用来采样某个光源，还有regularize，用来控制是否使用路径标准化
+
+```c++
+<<PathIntegrator Private Members>>= 
+int maxDepth;
+LightSampler lightSampler;
+bool regularize;
+```
+
+Li()这个方法的形式类似于SimplePathIntegrator::Li()
+
+```c++
+<<PathIntegrator Method Definitions>>= 
+SampledSpectrum PathIntegrator::Li(RayDifferential ray,
+        SampledWavelengths &lambda, Sampler sampler,
+        ScratchBuffer &scratchBuffer, VisibleSurface *visibleSurf) const {
+    <<Declare local variables for PathIntegrator::Li()>> 
+    <<Sample path from camera and accumulate radiance estimate>> 
+}
+```
+
+L, beta和depth变量与SimplePathIntegrator中是相同的意思
+
+```c++
+<<Declare local variables for PathIntegrator::Li()>>= 
+SampledSpectrum L(0.f), beta(1.f);
+int depth = 0;
+```
+
+同样，相似的，while循环的每次遍历会跟踪一条光线，来照到最近的交点和它的BSDF，注意，在while下面，重用了很多很多来自SimplePathIntegrator的代码片段，循环在到达最大路径深度或被俄罗斯轮盘赌中断前会一直继续
+
+```c++
+<<Sample path from camera and accumulate radiance estimate>>= 
+while (true) {
+    <<Trace ray and find closest path vertex and its BSDF>> 
+    <<End path if maximum depth reached>> 
+    <<Sample direct illumination from the light sources>> 
+    <<Sample BSDF to get new path direction>> 
+    <<Possibly terminate the path with Russian roulette>> 
+}
+return L;
+```

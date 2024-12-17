@@ -16,8 +16,6 @@
 
 #### 1.1 [图形学](ComputerScience/graphics/readme.md)
 
-pbrt-v4, GAMES202更新中
-
 #### 1.2 [编程语言](ComputerScience/ProgrammingLanguage/readme.md)
 
 #### 1.3 [AI](ComputerScience/AI/readme.md)
@@ -35,7 +33,3 @@ pbrt-v4, GAMES202更新中
 ### 7. [天文学](Astronomy/readme.md)
 
 ### 8. [人文学科](Humanities/readme.md)
-
-## 文章
-
-## 讲座

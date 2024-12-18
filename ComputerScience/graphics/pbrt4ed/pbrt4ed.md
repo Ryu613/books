@@ -91,11 +91,11 @@
 
 ## [第十六章 回顾与展望](chapter16/chapter16.md)
 
-## [附录A: 采样算法](appendix_A/appendix_A.md)
+## [附录A: 采样算法](annex_A/appendix_A.md)
 
-## [附录B: 工具](appendix_B/appendix_B.md)
+## [附录B: 工具](annex_B/appendix_B.md)
 
-## [附录C: 场景描述文件的处理](appendix_C/appendix_C.md)
+## [附录C: 场景描述文件的处理](annex_C/appendix_C.md)
 
 ## 参考资料
 

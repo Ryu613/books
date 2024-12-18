@@ -14,11 +14,15 @@ GAMES101课程 -> 《Computer Graphics(with OpenGL in C++)》 -> GAMES101作业 
 
 > 省略了较为基础的内容，对原书内容进行了重新总结
 
-## [GAMES202:高质量实时渲染(更新中)](GAMES202/GAMES202.md)
+## [GAMES202:高质量实时渲染](GAMES202/GAMES202.md)
 
 ## [A trip through the Graphics Pipeline](tripToGP.md)
 
 > 推荐阅读： 图形管线之旅
+
+## [Google Filament Doc](filament/official_doc.md)
+
+> 来自google的著名实时PBR渲染系统Filament的官方文档
 
 ## [vulkan](vulkan/readme.md)
 

@@ -28,4 +28,6 @@
 3. 逻辑设备都是归属于单个物理设备的
 4. 队列都是归属于单个逻辑设备的
 
-也就是说，Vulkan的创建步骤就是从上至下依次进行的
+### Vulkan实例
+
+vulkan可看作你应用的一个子系统。vulkan的内部状态都存储到了你提供的某个对象里，这个对象就叫instance，对应VkInstance对象。创建实例通过调用vkCreateInstance()

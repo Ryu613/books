@@ -4,6 +4,6 @@
 
 > 作者对如何学习vulkan给出了个人心得和有价值的资源
 
-## [Google Filament Doc](filament/official_doc.md)
+## [Vulkan Programming Guide](vpg/vpg.md)
 
-> 来自google的著名实时PBR渲染系统Filament的官方文档
+## [Modern Vulkan Cookbook](modern_vulkan_cookbook/mvc.md)

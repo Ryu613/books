@@ -300,4 +300,87 @@ vec3 F_Schlick(float u, vec3 f0) {
 }
 ```
 
-## 4.5 漫反射BRDF
+## 4.5 漫反射的BRDF
+
+在漫反射项中，$f_m$是朗伯函数，即变为下式:
+
+$$
+f_d(v,l)=\frac{\sigma}{\pi}\frac{1}{\vert n·v\vert \vert n·l\vert}\int_\omega D(m,\alpha)G(v,l,m)(v·m)(l·m)dm \tag{19}
+$$
+
+我们的实现用了简化的朗伯BRDF，假设在微表面半球上的反馈是均匀的:
+
+$$
+f_d(v,l)=\frac{\sigma}{\pi} \tag{20}
+$$
+
+实际上，漫反射率$\sigma$是在后续代码中才会乘上去,见下方代码:
+
+```GLSL
+float Fd_Lambert() {
+    return 1.0 / PI;
+}
+
+vec3 Fd = diffuseColor * Fd_Lambert();
+```
+
+朗伯BRDF明显极度高效，并且对于复杂模型，结果也非常接近现实
+
+然而，漫反射的部分应与镜面反射项保持一致，并要考虑表面的粗糙度。迪斯尼的漫反射BRDF和Oren-Nayar模型都考虑到了粗糙度的影响，并在掠射角的时候创造了逆反射的效应。我们在有限的条件下觉得质量提升小，性能成本高，不划算。此外，这种复杂漫反射模型也使基于图像和球谐函数的表达和实现更加困难
+
+> 就是漫反射边缘是会有类似镜面反射的效果，但是Filament考虑到对图像提升小且要消耗性能，加上会使后续算法更复杂，就省略了，但是开发者依旧可以在程序中使用disney这种方式
+
+## 4.6 标准模型的总结
+
+镜面反射项: Cook-Torrance镜面微表面模型，用了GGX法线分布函数，Smith-GGX高关联可见性函数，和Schlick Fresnel 函数
+
+漫反射项：朗伯漫反射模型
+
+完整GLSL如下:
+
+```GLSL
+float D_GGX(float NoH, float a) {
+    float a2 = a * a;
+    float f = (NoH * a2 - NoH) * NoH + 1.0;
+    return a2 / (PI * f * f);
+}
+
+vec3 F_Schlick(float u, vec3 f0) {
+    return f0 + (vec3(1.0) - f0) * pow(1.0 - u, 5.0);
+}
+
+float V_SmithGGXCorrelated(float NoV, float NoL, float a) {
+    float a2 = a * a;
+    float GGXL = NoV * sqrt((-NoL * a2 + NoL) * NoL + a2);
+    float GGXV = NoL * sqrt((-NoV * a2 + NoV) * NoV + a2);
+    return 0.5 / (GGXV + GGXL);
+}
+
+float Fd_Lambert() {
+    return 1.0 / PI;
+}
+
+void BRDF(...) {
+    vec3 h = normalize(v + l);
+
+    float NoV = abs(dot(n, v)) + 1e-5;
+    float NoL = clamp(dot(n, l), 0.0, 1.0);
+    float NoH = clamp(dot(n, h), 0.0, 1.0);
+    float LoH = clamp(dot(l, h), 0.0, 1.0);
+
+    // perceptually linear roughness to roughness (see parameterization)
+    float roughness = perceptualRoughness * perceptualRoughness;
+
+    float D = D_GGX(NoH, roughness);
+    vec3  F = F_Schlick(LoH, f0);
+    float V = V_SmithGGXCorrelated(NoV, NoL, roughness);
+
+    // specular BRDF
+    vec3 Fr = (D * V) * F;
+
+    // diffuse BRDF
+    vec3 Fd = diffuseColor * Fd_Lambert();
+
+    // apply lighting...
+}
+```

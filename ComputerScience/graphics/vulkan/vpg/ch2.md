@@ -28,7 +28,7 @@ vulkan中有两类最基本的内存: 宿主内存和设备内存，所有Vulkan
 
 1. image比起buffer具有额外的信息，包括布局，格式等。可以对其进行操作，比如过滤，混色，深度测试，裁剪测试，生成新的image
 
-### 资源视图
+### 资源视图(Resource View)
 
 1. 为了把buffer和image进行分块控制，可以为这些资源创建视图, buffer view就是buffer的一部分区域， image view就是某种格式的别名或者代表了image的一部分资源
 

@@ -14,7 +14,7 @@
 1. 必读[图形管线之旅](https://fgiesen.wordpress.com/2011/07/09/a-trip-through-the-graphics-pipeline-2011-index/)
 2. 读RTR里面的图形渲染管线章节
 3. 读[Vulkan in 30 minutes](https://renderdoc.org/vulkan-in-30-minutes.html),这个是RenderDoc作者写的，尝试把学到的概念与本文做联系
-4. 安装VulkanSDK和RenerDoc
+4. 安装VulkanSDK和RenderDoc
 5. 可选安装nVidia nSight或Radeon GPU Profiler 这俩是做性能检测的工具
 6. 收藏这些资源
     - API without Secrets
@@ -49,9 +49,9 @@ vulkan新手最怕的一部分。若你已经学过C/C++的多线程代码，就
 
 1. 不要怕ctrl cv
 2. 不要自作聪明去定义自己的函数和类
-3. 当你进入教程新的章节时，去读以下spec文档
+3. 当你进入教程新的章节时，去读一下spec文档
 
-无脑打代码没啥用，你不应该去死记硬背api，等以后实际用到了再说，搞定了理论以后，你很快就能学会API了。畸变你觉得某个抽象概念很重要，但是没有足够时间的代码基类也是会犯错的。有几个建议
+无脑打代码没啥用，你不应该去死记硬背api，等以后实际用到了再说，搞定了理论以后，你很快就能学会API了。即便你觉得某个抽象概念很重要，但是没有足够时间的代码基类也是会犯错的。有几个建议
 
 - 教程里预先在交换链里为每个framebuffer记录的指令是非常不现实的，大部分应用都需要动态绘制
 - 教程以线性顺序组织的，但是实际上没必要，你可以画一张时序图

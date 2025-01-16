@@ -54,5 +54,42 @@ VK_EXPORTED_FUNCTION( vkGetInstanceProcAddr )
 #undef VK_EXPORTED_FUNCTION
 ```
 
+> 声明了一个宏VK_EXPORTED_FUNCTION
+
 ### 2. ListOfFunctions.inl
 
+```c++
+#include "vulkan.h"
+
+namespace ApiWithoutSecrets {
+
+#define VK_EXPORTED_FUNCTION( fun ) PFN_##fun fun;
+#define VK_GLOBAL_LEVEL_FUNCTION( fun ) PFN_##fun fun;
+#define VK_INSTANCE_LEVEL_FUNCTION( fun ) PFN_##fun fun;
+#define VK_DEVICE_LEVEL_FUNCTION( fun ) PFN_##fun fun;
+
+#include "ListOfFunctions.inl"
+
+}
+```
+
+> 这里定义了一些宏，把某个函数fun替换成PFN_fun fun的对应对象的声明
+
+### 3. VulkanFunctions.cpp
+
+```c++
+typedef PFN_vkVoidFunction (VKAPI_PTR *PFN_vkGetInstanceProcAddr)(VkInstance instance, const char* pName);
+```
+
+> 这里意思是声明了一个叫PFN_vkGetInstanceProcAddr的函数指针，这个函数返回PFN_vkVoidFunction，参数为instance 和pName
+> VKAPI_PTR 是 Vulkan 中定义的一个宏，用于控制调用约定（calling convention）。在 Windows 平台上，它通常被定义为 __stdcall 或类似的关键字，表示函数的调用方式。它的目的是确保 Vulkan 函数的调用方式与平台的约定一致。
+>
+> 也就是用PFN_vkGetInstanceProcAddr函数指针指向了vkGetInstanceProcAddr函数
+
+### 4. Vulkan.h
+
+这个变量的定义代表了此函数长这样:
+
+```c++
+PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
+```

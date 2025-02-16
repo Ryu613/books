@@ -12,4 +12,4 @@
 
 ## [Vulkan Documentation](vulkan_documentation/vk_doc.md)
 
-## [Vulkan cookbook](vulkan_cookbook/vcook.md)
+## [Vulkan cookbook](vulkan-cookbook/vcook.md)

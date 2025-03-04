@@ -17,7 +17,7 @@
 2. 收藏github的awesome-vulkan，里面已经整理好了一系列有用的资料，但是注意筛选
 3. 把Vulkan cookbook一书实现一遍，先自己想办法写How to do it,然后再看How it works
 4. 看和实践: Vulkan-Game-Engine（若是用vulkan做图形）
-5. 看Vulkan Programming Guide一书
+5. 看Vulkan Programming Guide一书,这是目前最好的资料
 6. 看和实践Vulkan-Samples, Sancha Willems的Vulkan项目，里面有大量工程实际实现的案例，最好自己从头搭建实现
 7. 实战，手搓新项目，复习总结之前所学，写大量的代码，找更多的vulkan项目参考
 

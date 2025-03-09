@@ -3,3 +3,5 @@
 *.pdf
 *.~vsdx
 settings.json
+.vs/
+out/

@@ -10,9 +10,9 @@
 
 - Vulkan的图形管线长什么样
 - 如何创建图形管线对象
-- 如何使用Vulkan绘制图形原语
+- 如何使用Vulkan绘制图元
 
-把Vulkan当作图形API可能就是最常见的用法。图形功能就是Vulkan里最基本的部分，而且也驱动着任何视觉相关应用的核心。Vulkan中的图形处理可被视为一种管线，管线里需求的图形指令会在其中获取，并最终在显示设备上生产出一张图片。本章对Vulkan中图形管线的基础做了概括，并且介绍了我们的第一个图形例子。
+把Vulkan当作图形API可能就是最常见的用法。图形功能就是Vulkan里最基本的部分，而且也是任何视觉相关应用的驱动核心。Vulkan中的图形处理可被视为一种管线，管线里需求的图形指令会在其中获取，并最终在显示设备上生产出一张图片。本章对Vulkan中图形管线的基础做了概括，并且介绍了我们的第一个图形例子。
 
 > Vulkan一般处于视觉相关应用的核心位置，图形管线类似生产流水线，每一道工序就是一个阶段(stage),穿梭于这些阶段之间的就是各种图形指令，流水线的最终输出就是图片
 
@@ -32,7 +32,7 @@ Vulkan中的图形管线可视作一个生产流水线，指令从管线的开�
 - `tessellation control shader(细分控制着色器)`: 这个可编程的着色阶段是负责生成细分因子和其他被用于固定功能细分引擎的每个补丁过的数据
 - `tessellation primitive generation(细分图元生成)`: 没在图7.1中，此阶段有着固定的功能，会利用上一阶段的细分因子来把图元拆分成更小更简单的图元，以便在后续的细分计算着色器中进行着色
 - `tessellation evaluation shader(细分计算着色器)`: 这个着色阶段会把在细分图元生成器生成的每个新的顶点上运行。其操作与顶点着色器类似，不同的是其只对传入的生成的顶点着色，而不是从内存里读取的那些顶点进行着色。
--` geometry shader(几何着色器)`： 这个着色阶段会在完整的图元上操作。图元可能是点，线或者三角形，又或是前三者的特殊变种。这个阶段有能力在管线中途改变图元的类型
+- `geometry shader(几何着色器)`： 这个着色阶段会在完整的图元上操作。图元可能是点，线或者三角形，又或是前三者的特殊变种。这个阶段有能力在管线中途改变图元的类型
 - `primitive assembly图元组装`： 这个阶段会把顶点，细分，或几何阶段生成的多个顶点分组，并形成可用于栅格化的图元。这个阶段也会裁剪和剔除图元，然后把它们转换成恰当的viewport(视口)中
 - `裁剪和剔除`: 这个固定功能的阶段决定这些图元的那一部分会对输出图像有贡献，并且对于没贡献的部分图元进行丢弃，对可能可见的图元转发给栅格化
 - `rasterizer(栅格化)`：栅格化是vulkan中所有图形的基础核心。栅格化会取已被组合好，用一串顶点表示的图元，然后把其转换成单个fragment(片段),这些片段可能就是组成你图片的各个像素
@@ -399,5 +399,47 @@ result = vkCreateGraphicsPipelines(device,
 > 着色器（Shader）之间的数据传递遵循统一的声明方式
 
 在SPIR-V中的着色器声明一个输入，变量必须用Input修饰，同理，输出变量使用Output修饰。与GLSL不同的是，SPIR-V中，有特殊目的的输入输出参数没有预定义的名称，而是用它们的目的来修饰。然后你用GLSL写了着色器，并用GLSL编译器编译成SPIR-V。编译器会识别出访问内置变量，并且把其翻译为恰当的声明，并且把这些输入输出变量在SPIR-V着色器的结果中进行修饰
+
+## 顶点输入状态
+
+为了渲染真实的几何体，你需要把数据从管线开头传入进去。你可使用由SPIR-V提供的顶点和实例的索引来编程式的生成几何体，或者显式的从某个缓冲中获取几何体数据。又或者，你可以对美村中的几何数据布局做出描述，然后让Vulkan返回给你，并把其直接提供给你的着色器。
+
+为了实现此功能，我们使用VkGraphicsPipelineCreateInfo里的pVertexInputState成员来实现。此成员是一个指向VkPipelineVertexInputStateCreateInfo结构体的指针，其定义如下:
+
+```c
+typedef struct VkPipelineVertexInputStateCreateInfo {
+    VkStructureType sType; // VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
+    const void* pNext; // nullptr
+    VkPipelineVertexInputStateCreateFlags flags; // 预留字段,设置为0
+    uint32_t vertexBindingDescriptionCount; // 顶点绑定的数量
+    const VkVertexInputBindingDescription* pVertexBindingDescriptions; //顶点绑定描述的数组指针
+    uint32_t vertexAttributeDescriptionCount;
+    const
+    VkVertexInputAttributeDescription* pVertexAttributeDescriptions;
+} VkPipelineVertexInputStateCreateInfo;
+```
+
+此结构体也是用sType, pNext字段打头。应被设置为VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO和nullptr, flags字段是预留字段，应设为0
+
+顶点的输入状态被分为两个部分，顶点绑定和顶点属性：
+
+- `顶点的绑定`： 用于绑定包含顶点数据的缓冲
+- `顶点的属性`： 描述顶点数据在缓冲里的布局方式
+
+绑定到顶点缓冲绑定点的缓冲某些时候被视为顶点缓冲。但是一般不会用顶点缓冲这个词称呼它，某种意义上，任何缓冲都能存储顶点数据，并且单个缓冲可以存储顶点数据，也可以存储其他类型的数据。用于存储顶点数据的缓冲的唯一要求是，其必须是使用VK_BUFFER_USAGE_VERTEX_BUFFER_BIT标志创建的。
+
+vertexBindingDescriptionCount是被管线使用的顶点绑定的数量，pVertexBindingDescriptions是指向多个VkVertexInputBindingDescription结构体数组的指针，灭个结构体描述了其中一个绑定，其定义如下:
+
+```c
+typedef struct VkVertexInputBindingDescription {
+    uint32_t binding; // 绑定的索引值，多个绑定不需要索引值连续
+    uint32_t stride; // 
+    VkVertexInputRate inputRate;
+} VkVertexInputBindingDescription;
+```
+
+binding字段是此结构体描述的绑定的索引，每个管线可以定位多个顶点缓冲绑定，并且它们的索引不需要是相邻的。没必要在某个管线里描述每一个绑定，只需要每个每个绑定都有其描述即可
+
+被VkVertexInputBinddingDescription声明的最后一个绑定索引必须小于设备所支持的绑定最大数量。这个限制至少大于16，但是对于某些设备，可能比这个值高。若你不需要大于16个绑定，那就没必要检查这个限制值。然而，你可以使用在VkPhysicalDeviceLimits结构体里的maxVertexInputBindings，决定最高绑定索引，此结构体可通过调用vkGetPhysicalDeviceProperties()获取
 
 ### 待补3

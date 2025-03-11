@@ -402,7 +402,7 @@ result = vkCreateGraphicsPipelines(device,
 
 ## 顶点输入状态
 
-为了渲染真实的几何体，你需要把数据从管线开头传入进去。你可使用由SPIR-V提供的顶点和实例的索引来编程式的生成几何体，或者显式的从某个缓冲中获取几何体数据。又或者，你可以对美村中的几何数据布局做出描述，然后让Vulkan返回给你，并把其直接提供给你的着色器。
+为了渲染真实的几何体，你需要把数据从管线开头传入进去。你可使用由SPIR-V提供的顶点和实例的索引来编程式的生成几何体，或者显式的从某个缓冲中获取几何体数据。又或者，你可以对内存中的几何数据布局做出描述，然后让Vulkan返回给你，并把其直接提供给你的着色器。
 
 为了实现此功能，我们使用VkGraphicsPipelineCreateInfo里的pVertexInputState成员来实现。此成员是一个指向VkPipelineVertexInputStateCreateInfo结构体的指针，其定义如下:
 
@@ -414,8 +414,7 @@ typedef struct VkPipelineVertexInputStateCreateInfo {
     uint32_t vertexBindingDescriptionCount; // 顶点绑定的数量
     const VkVertexInputBindingDescription* pVertexBindingDescriptions; //顶点绑定描述的数组指针
     uint32_t vertexAttributeDescriptionCount;
-    const
-    VkVertexInputAttributeDescription* pVertexAttributeDescriptions;
+    const VkVertexInputAttributeDescription* pVertexAttributeDescriptions;
 } VkPipelineVertexInputStateCreateInfo;
 ```
 
@@ -428,18 +427,152 @@ typedef struct VkPipelineVertexInputStateCreateInfo {
 
 绑定到顶点缓冲绑定点的缓冲某些时候被视为顶点缓冲。但是一般不会用顶点缓冲这个词称呼它，某种意义上，任何缓冲都能存储顶点数据，并且单个缓冲可以存储顶点数据，也可以存储其他类型的数据。用于存储顶点数据的缓冲的唯一要求是，其必须是使用VK_BUFFER_USAGE_VERTEX_BUFFER_BIT标志创建的。
 
-vertexBindingDescriptionCount是被管线使用的顶点绑定的数量，pVertexBindingDescriptions是指向多个VkVertexInputBindingDescription结构体数组的指针，灭个结构体描述了其中一个绑定，其定义如下:
+vertexBindingDescriptionCount是被管线使用的顶点绑定的数量，pVertexBindingDescriptions是指向多个VkVertexInputBindingDescription结构体数组的指针，每个结构体描述了其中一个绑定，其定义如下:
 
 ```c
 typedef struct VkVertexInputBindingDescription {
     uint32_t binding; // 绑定的索引值，多个绑定不需要索引值连续
-    uint32_t stride; // 
-    VkVertexInputRate inputRate;
+    uint32_t stride; // 结构体之间的字节跨度，设备至少支持2048 byte
+    VkVertexInputRate inputRate; // 用顶点索引还是实例索引迭代
 } VkVertexInputBindingDescription;
 ```
 
 binding字段是此结构体描述的绑定的索引，每个管线可以定位多个顶点缓冲绑定，并且它们的索引不需要是相邻的。没必要在某个管线里描述每一个绑定，只需要每个每个绑定都有其描述即可
 
 被VkVertexInputBinddingDescription声明的最后一个绑定索引必须小于设备所支持的绑定最大数量。这个限制至少大于16，但是对于某些设备，可能比这个值高。若你不需要大于16个绑定，那就没必要检查这个限制值。然而，你可以使用在VkPhysicalDeviceLimits结构体里的maxVertexInputBindings，决定最高绑定索引，此结构体可通过调用vkGetPhysicalDeviceProperties()获取
+
+每个绑定可视作位于缓冲对象中的结构体数组。数组之间的跨步，即每个结构体的其实位置之间的距离，用字节来衡量，就用stride字段来设定。若顶点数据被当成结构体的数组来设定，那么stride就必须包含这个结构体的大小，即便着色器没有使用这个结构体的所有成员。对于任何特定点的绑定，stride的最大值是取决于驱动的实现的。但是可保证至少有2048字节。若你想要使用大过此值的顶点数据，你需要确认设备是否支持。可通过设备的VkPhysicalDeviceLimits结构体中的maxVertexInputBindingStride字段确认。
+
+此外，Vulkan可以在数组里用顶点索引或实例索引迭代。可在inputRate字段设定，值是VK_VERTEX_INPUT_RATE_VERTEX或VK_VERTEX_INPUT_RATE_INSTANCE
+
+每个顶点的属性都必须是顶点缓冲里的结构体里的其中一个成员。每个来源于顶点缓冲的顶点属性共享步进的速率和数组的跨度，但是结构体内部有自己的数据类型和偏移量。可用VKVertexInputAttributeDescription结构体来描述。这些结构体数组的地址通过pVertexAttributeDescription传入，数组的元素个数通过vertexAttributeDescriptionCount传入。VkVertexInputAttributeDescription的定义如下:
+
+```c
+typedef struct VkVertexInputAttributeDescription {
+    uint32_t location; // 设置顶点着色器里的location
+    uint32_t binding; // 绑定点的索引？
+    VkFormat format; // 顶点数据的格式
+    uint32_t offset; // 结构体之间的偏移量
+} VkVertexInputAttributeDescription;
+```
+
+每个属性都有一个location，用于代表在顶点着色器中的值。同样的，顶点属性的位置不需要是紧邻的，也没必要为每个顶点属性的位置都进行描述，只要所有被管线用到的属性被描述了即可。属性的位置通过location设定
+
+绑定到buffer的绑定，和从哪个属性获取其数据，是通过binding字段设定的，并且应该匹配以VkVertexInputBindingDescription结构体数组中，其中一个绑定相匹配。顶点数据的格式是用format设定的，并且每个结构体之间的偏移量用offset来设定
+
+就如结构体的总大小有上限值一样，每个属性从结构体开头开始的便宜量也有上限，offset的上限至少有2047字节，足够大来在某个结构体(最大至少2048byte)的末尾防止一个字节。若你需要是用更大的结构体，你就需要检查设备是否支持。通过VkPhysicalDeviceLimits结构体里的maxVertexInputAttributeOffset字段来确认，可通过调用vkGetPhysicalDeviceProperties()函数获取
+
+清单7.3 展示了如何用C++创建结构体，并且使用VkVertexInputBindingDescription和VkVertexInputAttributeDescription来描述，这样，你就能用来把顶点数据传给Vulkan
+
+```c++
+typedef struct vertex_t
+{
+    vmath::vec4 position;
+    vmath::vec3 normal;
+    vmath::vec2 texcoord;
+} vertex;
+
+static const VkVertexInputBindingDescription vertexInputBindings[] =
+{
+    { 0, sizeof(vertex), VK_VERTEX_INPUT_RATE_VERTEX } // Buffer
+};
+
+static const VkVertexInputAttributeDescription vertexAttributes[] =
+{
+    { 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0 }, //Position
+    { 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(vertex, normal) }, //Normal
+    { 2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(vertex, texcoord) } // TexCoord
+};
+
+static const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo =
+{
+    VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, // sType
+    nullptr, // pNext
+    0, // flags
+    vkcore::utils::arraysize(vertexInputBindings), //
+    vertexBindingDescriptionCount
+    vertexInputBindings, //
+    pVertexBindingDescriptions
+    vkcore::utils::arraysize(vertexAttributes), //
+    vertexAttributeDescriptionCount
+    vertexAttributes //
+    pVertexAttributeDescriptions
+};
+```
+
+能被单个顶点着色器使用的输入属性的最大数量取决于驱动的实现，但是保证不低于16, 这是pVertexInputAttributeDescriptions数组里的结构体的数量上限。某些驱动实现可能可以支持更多的输入。为了确定你可使用的顶点着色器输入的最大数量，检查设备的VkPhysicalDeviceLimits里的maxVertexInputAttributes字段
+
+顶点数据是从顶点缓冲中读取的，这个缓冲就是你绑定并且传给顶点着色器的那个指令缓冲。为了使顶点着色器能够解析顶点数据，其必须根据你已定义的顶点属性来声明这个输入参数。为了做到这点，在你的SPIR-V的顶点着色器中，使用Input存储类来创建一个变量。在GLSL着色器中，可以用一个in变量来表达。
+
+每个输入必须有一个已赋值的location。在GLSL中使用location布局限定符来设定，这个变量之后会翻译为SPIR-V，并用的Location修饰符修饰此输入值。清单7.4展示了GLSL顶点着色器的片段，声明了一些输入值，用glslangvalidator输出得到的SPIR-V结果见清单7.5
+
+为了更清晰的展示被声明的输入值，清单7.5中展示的着色器是不完整的
+
+清单7.4 在顶点着色器上声明输入值(GLSL)
+
+```GLSL
+#version 450 core
+layout (location = 0) in vec3 i_position;
+layout (location = 1) in vec2 i_uv;
+void main(void)
+{
+gl_Position = vec4(i_position, 1.0f);
+}
+```
+
+清单7.5 在顶点着色器上声明输入值(SPIR-V)
+
+```SPIR-V
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 1
+; Bound: 30
+; Schema: 0
+OpCapability Shader
+%1 = OpExtInstImport "GLSL.std.450"
+OpMemoryModel Logical GLSL450
+OpEntryPoint Vertex %4 "main" %13 %18 %29
+OpSource GLSL 450
+OpName %18 "i_position" ;; Name of i_position
+OpName %29 "i_uv" ;; Name of i_uv
+OpDecorate %18 Location 0 ;; Location of i_position
+OpDecorate %29 Location 1 ;; Location of i_uv
+...
+%6 = OpTypeFloat 32 ;; %6 is 32-bit floating-point type
+%16 = OpTypeVector %6 3 ;; %16 is a vector of 3 32-bit floats
+(vec3)
+%17 = OpTypePointer Input %16
+%18 = OpVariable %17 Input ;; %18 is i _position - input pointer to
+vec3%27 = OpTypeVector %6 2 ;; %27 is a vector of 2 32-bit floats
+%28 = OpTypePointer Input %27
+%29 = OpVariable %28 Input ;; %29 is i _uv - input pointer to vec2
+...
+```
+
+也可以声明一个只对应某个顶点属性分量的顶点着色器输入值。换句话说，顶点属性是应用通过顶点缓冲提供的数据，而顶点着色器输入值是着色器中用于接收这些数据的变量，vulkan会自动从缓冲中读取数据并填充该变量
+
+为了创建一个对应了某个输入向量的一组子分量的顶点着色器输入值，可使用GLSL的component布局限定符，其被翻译为SPIR-V里的Component修饰符，并运用到此顶点着色器输入值上。每个顶点着色输入值能够从分量的0开始到3，对应了原始数据里的x,y,z，和w通道值。每个输入值会消耗它所需的连续分量，即，一个标量消耗单个分量，一个vec2消耗2个，一个vec3消耗3个，以此类推。
+
+顶点着色器也能声明一个矩阵作为输入值，在GLSL中，就跟使用in的存储限定符一样简单，在SPIR-V里，矩阵使用一个特别类型的向量，其内部含有一组向量，来对其声明。默认情况下，矩阵被视为列优先的。因此，每组连续的数据会填充矩阵中的单个列。
+
+## 输入集成
+
+图形管线的输入集成阶段取顶点数据，并且把其分组成图元，用来被管线中的后续阶段做处理。其可用VkPipelineInputAssemblyStateCreateInfo结构体来描述，通过pInputAssemblyState成员传入。此结构体的定义如下:
+
+```c
+typedef struct VkPipelineInputAssemblyStateCreateInfo {
+    VkStructureType sType; // VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
+    const void* pNext; // nullptr
+    VkPipelineInputAssemblyStateCreateFlags flags; // 0
+    VkPrimitiveTopology topology;
+    VkBool32 primitiveRestartEnable;
+} VkPipelineInputAssemblyStateCreateInfo;
+```
+
+sType应被设为VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, pNext设为nullptr, flags是保留字段，设为0
+
+图元拓扑通过topology字段设定，应是Vulkan支持的其中一种图元拓扑，包含在VkPrimitiveTopology枚举中。枚举里最简单的拓扑就是list，包括如下值:
+
+
 
 ### 待补3

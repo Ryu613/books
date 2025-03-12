@@ -95,9 +95,9 @@ vkCreateRenderPass()里的device参数就是要创建renderpass对象的设备�
 
 ```c
 typedef struct VkRenderPassCreateInfo {
-    VkStructureType sType;
-    const void* pNext;
-    VkRenderPassCreateFlags flags;
+    VkStructureType sType; // VK_STRUCTURE_TYPE_RENDERPASS_CREATE_INFO
+    const void* pNext; // nullptr
+    VkRenderPassCreateFlags flags; // 0
     uint32_t attachmentCount;
     const VkAttachmentDescription* pAttachments;
     uint32_t subpassCount;
@@ -573,6 +573,111 @@ sType应被设为VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, pNex
 
 图元拓扑通过topology字段设定，应是Vulkan支持的其中一种图元拓扑，包含在VkPrimitiveTopology枚举中。枚举里最简单的拓扑就是list，包括如下值:
 
+- VK_PRIMITIVE_TOPOLOGY_POINT_LIST: 每个顶点被用来构建独立的点
+- VK_PRIMITIVE_TOPOLOGY_LINE_LIST: 顶点每两个进行分组，每对组成从第一个点到第二个点的一条线
+- VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST: 顶点每三个进行分组，组成三角形
 
+接下来是条状和扇状图元，每条线或三角形会与之前的图元共享1或2个顶点，用多组顶点组合成图元。条状和扇状图元有如下选项:
+
+- VK_PRIMITIVE_TOPOLOGY_LINE_STRIP: 绘制中开头的两个顶点组成一条线段，之后的每个新顶点从前一个点组成一条新线段，结果会是线段组成的序列
+- VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP: 绘制中开头的三个顶点会组成一个三角形，之后的每个顶点与前两个顶点组成新的三角形，结果会是相连的一行三角形，每个三角形共享一条边
+- VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN: 绘制中前三个顶点组成一个三角形，之后的每个顶点与最初，和最后一个顶点组成新的三角形
+
+条状和扇状拓扑并不复杂，但若不熟悉，可能难以可视化，图7.2展示了这些拓扑结构的图形:
+
+![图7.2](img/fg7_2.png)
+
+图7.2 条状和扇状拓扑
+
+接下来是邻接图元，一般只在几何着色器启用时使用，其可以在一个原始网格中传达关于下一个图元的额外信息。邻接图元拓扑有:
 
 ### 待补3
+
+在上面结构体里的最后一个参数是primitiveRestartEnable, 这是一个标志，用于允许条状和扇状图元拓扑可被裁剪并重新开始。若没有此标志，每个条状或扇状图元就需要分开绘制。当你使用重启标志，许多条状或扇状图元可以被组合成单次绘制。重启标志只在当使用索引化的绘制时生效，因为重新开始条状绘制的点在索引缓冲中被标记为使用一个特殊的，保留的值。详见第八章
+
+## 曲面细分状态
+
+### 待补4
+
+## 视口状态
+
+视口变换是在栅格化之前的最终依次坐标变换。其把顶点从归一化的设备坐标变换为视窗坐标。多个视口可同时使用。这些是扣的状态，包括活动的视口数量及其参数，是通过VkPipelieViewportStateCreateInfo结构体设置的，通过pViewportState传入到VkGraphicsPipelineCreateInfo。定义如下:
+
+```c
+typedef struct VkPipelineViewportStateCreateInfo {
+    VkStructureType sType; // VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO
+    const void* pNext; // nullptr
+    VkPipelineViewportStateCreateFlags flags; // 0
+    uint32_t viewportCount; // 管线可用的视口数量
+    const VkViewport* pViewports; // 视口(数组指针)
+    uint32_t scissorCount; // 矩形裁剪的数量
+    const VkRect2D* pScissors; // 矩形裁剪(数组指针)
+} VkPipelineViewportStateCreateInfo;
+```
+sType应被设置为VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, pNext应设为nullptr, flag字段是为未来Vulkan版本保留的字段，设为0
+
+对于管线可用的视口数量在viewportCount设置，每个视口的维度通过VkViewport数组传入到pViewports，VkViewport定义如下:
+
+```c
+typedef struct VkViewport {
+    float x;
+    float y;
+    float width;
+    float height;
+    float minDepth;
+    float maxDepth;
+} VkViewport;
+```
+
+VkPipelineViewportStateCreateInfo结构体也被用来设置管线的矩形裁剪，如同视口那样，单个管线可定义多个矩形裁剪，通过VkRect2D结构体传入，矩形裁剪的数量通过scissorCount设定，注意，视口和矩形裁剪的在绘制中的索引是相同的，所以你必须把scissorCount和viewportCount设为同一个值。VkRect2D是一个简单的结构体，用于定义一个二维矩形，在Vulkan中有多种用途，其定义如下:
+
+```c
+typedef struct VkRect2D {
+    VkOffset2D offset;
+    VkExtent2D extent;
+} VkRect2D;
+```
+
+支持多视口是可选的。当多视口被支持，那么至少可用数量为16。在单个图形管线中可用的最大视口数量可被maxViewports参数决定，其在VkPhysicalDeviceLimits结构体下，此结构体通过vkGetPhysicalDeviceProperties()函数返回。若多个视口被支持，那么其下限为16.否则，此字段会包含1.
+
+关于视口变换如何运作，和如何在你的应用中使用多个视口，详见第九章。关于裁剪测试详见第十章。为了简化渲染到整个帧缓冲，停用裁剪测试，并且创建带有相同维度的单个视口，来作为帧缓冲的色彩附件。
+
+## 栅格化状态
+
+栅格化是基本的处理，因此用顶点表示的图元可被转换为片段组成的流，其可被你的片段着色器进行着色。栅格化的状态控制这个处理过程，并可通过VkPipelineRasterizationStateCreateInfo设置，通过pRasterizationState参数传给图形管线的VkGraphicsPipelineCreateInfo。VkPipelineRaterizationStateCreateInfo定义如下:
+
+```c
+typedef struct VkPipelineRasterizationStateCreateInfo {
+    VkStructureType sType;
+    const void* pNext;
+    VkPipelineRasterizationStateCreateFlags flags;
+    VkBool32 depthClampEnable;
+    VkBool32 rasterizerDiscardEnable;
+    VkPolygonMode polygonMode;
+    VkCullModeFlags cullMode;
+    VkFrontFace frontFace;
+    VkBool32 depthBiasEnable;
+    float depthBiasConstantFactor;
+    float depthBiasClamp;
+    float depthBiasSlopeFactor;
+    float lineWidth;
+} VkPipelineRasterizationStateCreateInfo;
+```
+
+### 待补5
+
+## 多重采样状态
+
+### 待补6
+
+## 深度和模板状态
+
+### 待补7
+
+## 颜色混合状态
+
+### 待补8
+
+## 动态状态
+
+### 待补9

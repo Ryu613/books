@@ -66,8 +66,139 @@ GLFW是用C语言编写且主要针对OpenGL实现。后文将一步步带你创
 
 [NOTE]
 ====
-我们是从源码构建64位，如果你是用预编译的版本，注意别搞下载错
+我们是从源码构建64位，如果你是用预编译的版本，注意别下载错
 ====
 
+> 我是用cmake管理的，此处略
 
+=== GLAD
+
+OpenGL的函数所在的位置取决于操作系统，导出函数的操作比较麻烦，所以我们使用GLAD库完成此操作
+
+从link:http://glad.dav1d.de[GLAD网站]生成源码
+
+[NOTE]
+====
+此教程使用GLAD1，别搞错版本
+====
+
+* __API__选择3.3(及以上)，
+* __profile__选择__core__, 
+* __Generate a loader__ 选项打勾
+
+配置完毕后应该可以导入头文件不报错
+
+[source,C++]
+----
+#include <glad/glad.h> 
+----
+
+== Hello Window
+
+头文件注意引入顺序，glad要先于glfw
+
+[source,C++]
+----
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+----
+
+然后，可以创建窗口
+
+[source,C++]
+----
+int main()
+{
+    glfwInit();
+    // 要使用OpenGL版本为3.3
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    // 使用核心模式，不用考虑就旧版本兼容性
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // MAC OS X 系统打开此项
+    //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  
+    return 0;
+}
+----
+
+如果上面代码运行时报错__undefined reference errors__,那么你没有成功链接GLFW库
+
+[TIP]
+====
+需要驱动支持OpenGL 3.3以上版本，可以下载link:http://download.cnet.com/OpenGL-Extensions-Viewer/3000-18487_4-34442.html[OpenGL Extension Viewer]查看当前支持的OpenGL版本，若不支持可以尝试下载新驱动
+====
+
+然后，我们就可以创建窗口了
+
+[source,C++]
+----
+GLFWwindow* window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
+if (window == NULL)
+{
+    std::cout << "Failed to create GLFW window" << std::endl;
+    glfwTerminate();
+    return -1;
+}
+glfwMakeContextCurrent(window);
+----
+
+=== GLAD
+
+前文提到我们使用GLAD管理OpenGL的函数指针，所以在使用OpenGL函数前，需要先初始化GLAD
+
+[source,C++]
+----
+// 用GLAD的函数从GLFW的glfwGetProcAddress获取到正确的函数
+if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+{
+    std::cout << "Failed to initialize GLAD" << std::endl;
+    return -1;
+}   
+----
+
+=== 视口
+
+通过__glViewport__告诉OpenGL渲染窗口的大小
+
+[source,C++]
+----
+// 前两个参数表示窗口的左下角位置，后两个参数代表右上角
+// 这个参数可以小于窗口的大小
+glViewport(0, 0, 800, 600); 
+----
+
+[TIP]
+====
+通过__glViewport__指定的视口大小会被转换为屏幕的坐标，屏幕坐标原点(0,0)在视口中心,左下角是(-1,-1),右上角是(1,1)
+====
+
+当窗口变更了大小时，通过一个回调函数获取到窗口大小的变更请求，回调函数的原型如下:
+
+[source,C++]
+----
+// 第一个参数就是窗口的指针，后两个整数代表调整后的窗口的大小，当窗口改变了大小时，会回调此函数
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);  
+----
+
+可在此回调函数中实现当窗口大小改变时要进行的操作
+
+[source,C++]
+----
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    glViewport(0, 0, width, height);
+}  
+----
+
+然后把此函数注册到GLFW上
+
+[source,C++]
+----
+glfwSetFramebufferSizeCallback(window, framebuffer_size_callback); 
+----
+
+还有很多可注册的回调函数，比如手柄输入变化，错误处理等，应该在窗口创建后，渲染循环开始前完成
+
+=== 准备你的引擎
 

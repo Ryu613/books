@@ -1,0 +1,32 @@
+= Learn OpenGL
+:toc:
+:toc-title: 目录
+:toclevels: 3
+
+====
+根据link:https://www.learnopengl.com[Learn OpenGL]总结的内容
+
+按照每章节小节整理，只总结最精要的部分，但是主要知识点都会有，无论本人熟悉与否
+----
+网站内容日期: 2025/3/22
+----
+====
+
+:leveloffset: +1
+
+'''
+
+include::1-introduction.adoc[]
+include::2-getting_started.adoc[]
+
+:leveloffset: -1
+
+//  [introduction](1-introduction.md)
+// 2. [getting started](2-getting_started.md)
+// 3. [lighting](3-lighting.md)
+// 4. [model loading](4-model_loading.md)
+// 5. [advanced OpenGL](5-advanced_OpenGL.md)
+// 6. [Advanced Lighting](6-advanced_lighting.md)
+// 7. [PBR](7-PBR.md)
+// 8. [in practice](8-in_practice.md)
+// 9. [guest Articles](9-guest_articles.md)]

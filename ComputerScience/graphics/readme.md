@@ -27,3 +27,7 @@ GAMES101课程 -> 《Computer Graphics(with OpenGL in C++)》 -> GAMES101作业 
 ## [vulkan](vulkan/readme.md)
 
 vulkan相关的资料整理在此
+
+## [OpenGL](opengl/toc.adoc)
+
+OpenGL笔记

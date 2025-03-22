@@ -1,0 +1,73 @@
+= 开始吧!
+
+== OpenGL
+
+OpenGL不仅是对图形和图像进行操作的 [.green]#API#，本身也是一种规范，此种规范由link:https://www.khronosgroup.com[Khronos Group]开发和维护
+
+[TIP]
+====
+OpenGL库的一般由显卡厂商实现，不同的显卡支持不同版本的OpenGL。若有非预期的错误，推荐升级显卡驱动。
+====
+
+此教程使用OpenGL3.3, 特性文档link:https://www.opengl.org/registry/doc/glspec33.core.20100311.withchanges.pdf[在此]
+
+=== 核心模式 vs 立即模式
+
+* 立即模式(immediate mode): 过时，简单，低效，功能固定
+* 核心模式(core-profile): 现代，难，高效，功能灵活
+
+从3.2版本开始，立即模式被标记为过时，当使用核心模式时，若使用了过时的功能，OpenGL会报错并停止绘制。
+
+之所以不用最新版而是3.3，是因为3.3之后的版本都是在其之上添加新功能，没有本质上的大变化，学了3.3后可以很快学会新版本
+
+[NOTE]
+====
+若使用最新版OpenGL,只有最新显卡才能运行你的程序。所以大部分开发者使用旧版本，新版本是可选项
+====
+
+=== 扩展
+
+[.green]#扩展(extension)# 为OpenGL提供了额外的功能，可在驱动中看到支持的扩展。在使用前必须检查驱动是否支持。
+
+大部分功能在3.3版，几乎不需要额外启用扩展，后续若用到会说明。
+
+=== 状态机
+
+OpenGL本身是一个大型状态机，有一组变量定义了OpenGL应该如何进行操作。OpenGL的状态一般叫做 [.green]#上下文(context)#, 在使用时，通过设定一些选项来改变其状态，以便用当前上下文来操作缓冲和渲染。
+
+OpenGL里通过 [.green]#状态变更(state-changing)# 的函数来改变上下文，然后通过 [.green]#状态使用(state-using)# 的函数来执行操作。
+
+=== 对象
+
+OpenGL的库是用C语言写的，并且可以用其他语言派生。[.green]#对象(Object)# 在OpenGL中代表一部分状态的配置项。
+
+=== 让我们开始吧
+
+前文有不懂的没关系，后文会慢慢懂的
+
+=== 额外资源
+
+* link:https://www.opengl.org[opengl.org]: OpenGL官网
+* link:https://www.opengl.org/registry[OpenGL registry]: OpenGL特性和扩展文档
+
+== 创建窗口
+
+首先需要创建窗口，由于不同操作系统的窗口创建方式不一，故使用第三方窗口库来实现支持跨平台的窗口实现，这里使用GLFW
+
+=== GLFW
+
+GLFW是用C语言编写且主要针对OpenGL实现。后文将一步步带你创建一个简单的窗口
+
+文中所用的IDE是VS 2019
+
+=== 构建GLFW
+
+从link:http://www.glfw.org/download.html[下载页面]下载GLFW包，我们不用预编译好的库，而是自己构建
+
+[NOTE]
+====
+我们是从源码构建64位，如果你是用预编译的版本，注意别搞下载错
+====
+
+
+

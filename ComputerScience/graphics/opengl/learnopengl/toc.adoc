@@ -1,7 +1,7 @@
 = Learn OpenGL
 :toc:
 :toc-title: 目录
-:toclevels: 3
+:toclevels: 2
 
 ====
 根据link:https://www.learnopengl.com[Learn OpenGL]总结的内容
@@ -12,14 +12,9 @@
 ----
 ====
 
-:leveloffset: +1
-
-'''
 
 include::1-introduction.adoc[]
 include::2-getting_started.adoc[]
-
-:leveloffset: -1
 
 //  [introduction](1-introduction.md)
 // 2. [getting started](2-getting_started.md)

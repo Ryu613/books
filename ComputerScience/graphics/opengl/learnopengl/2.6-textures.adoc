@@ -1,0 +1,118 @@
+=== 纹理
+
+[.green]#纹理(texture)# 是一张二维图像，用于为一个物体添加表面细节。
+
+给三角形加上纹理，需要告诉OpenGL每个顶点对应纹理的哪个地方。故每个顶点要有一个 [.green]#纹理坐标(texture coordinate)# 其余的像素点交给片段插值完成
+
+纹理坐标的范围是[0,1],有x,y两个坐标轴(2D纹理图像)，从纹理坐标上获取颜色的操作叫 [.green]#采样(sampling)#,
+原点位于左下角，(1,1)位于右上角，如图所示:
+
+image::img/fg2_7.png[]
+
+此处我们分别为三角形的三个顶点对应三个纹理坐标,如下:
+
+[source,C++]
+----
+float texCoords[] = {
+    0.0f, 0.0f,  // lower-left corner  
+    1.0f, 0.0f,  // lower-right corner
+    0.5f, 1.0f   // top-center corner
+};
+----
+
+由于有多种采样的方式，需要告诉OpenGL如何采样这些纹理。
+
+==== 纹理包装
+
+若纹理坐标超过范围，默认情况下OpenGL会重复这些纹理图片，还有其他方式可选择:
+
+* [.blue]#GL_REPEAT#: 默认方式，重复纹理图像
+* [.blue]#GL_MIRRORED_REPEAT#: 与GL_REPEAT相似，但是重复时镜像图像
+* [.blue]#GL_CLAMP_TO_EDGE#: 把坐标夹拢到0,1之间, 范围外的颜色会是边界的颜色
+* [.blue]#GL_CLAMP_TO_BORDER#: 范围外的纹理使用用户定义的颜色填充
+
+效果如下:
+
+image::img/fg2_8.png[]
+
+这些选项可以通过glTexParameter应用到每个坐标轴上:
+
+[source,C++]
+----
+/**
+ * 参数如下:
+ * 纹理目标: 此处是2D纹理
+ * 要配置的纹理坐标轴：此处是S轴
+ * 包装模式: 此处是GL_MIRRORED_REPEAT
+ */
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+----
+
+若我们选的是 [.blue]#GL_CLAMP_TO_BORDER# 那么还需要设定一个边界颜色，可用glTexParameter函数实现，如下:
+
+[source,C++]
+----
+float borderColor[] = { 1.0f, 1.0f, 0.0f, 1.0f };
+glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+----
+
+==== 纹理过滤
+
+纹理坐标与纹理的分辨率无关，可以是任意浮点数，故OpenGL需要知道哪个纹理像素点(也叫 [.green]#纹素(texel)# )与纹理坐标对应。
+
+OpenGL有 [.green]#纹理过滤(texture filtering)# 的选项，最主要的是 [.blue]#GL_NEAREST# 和 [.blue]#GL_LIEAR#
+
+* [.blue]#GL_NEAREST#: 默认方式，也叫 [.green]#最邻近过滤(nearest neighbor) 或 点(point)过滤#，会选择最接近纹理坐标的像素点的颜色
+
+image::img/fg2_9_0.png[]
+
+* [.blue]#GL_LINEAR#: 也叫[.green]#双线性过滤# 根据纹理坐标相邻的纹素值，近似出颜色值，越接近纹素的中心，颜色越接近那个像素
+
+image::img/fg2_9_1.png[]
+
+两种过滤方式的效果对比如下:
+
+image::img/fg2_10.png[]
+
+GL_NEAREST看起来颗粒感更强，GL_LINEAR看起来更柔和，像素之间的边界感弱，一般真实感更偏向采用GL_LINEAR
+
+可以在纹理的扩大和缩小操作时设置纹理的过滤方式
+
+[source,C++]
+----
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+----
+
+===== 纹理映射
+
+当视角的源出有大量带有高分辨率纹理的物体时，OpenGL取颜色要从大量纹理中获取，这会导致颜色选择困难和错误，比如一些小的物体，而且浪费内存带宽。
+
+为了解决此问题，OpenGL用了一种叫[.green]##纹理映射(mipmap)##的概念，其就是由一组相邻相差2倍分辨率的纹理组成，在不同距离下，使用不同的mipmap, 当距离远时，使用低分辨率的纹理，减少内存缓存数据，类似下方的样式:
+
+image::img/fg2_11.png[mipmap]
+
+手动创建mipmap比较麻烦，OpenGL可以通过glGenerateMipmap帮我们完成
+
+当在mipmap的不同等级之间切换时，OpenGL可能会由一些瑕疵，比如尖锐的边缘等，类似纹理过滤，也可以设置mipmap等级之间的过滤方式，有以下几个选项
+
+* [.blue]##GL_NEAREST_MIPMAP_NEAREST##: 取最近的mipmap来匹配像素的大小，并且使用最近相邻插值法来做纹理采样
+* [.blue]##GL_LINEAR_MIPMAP_NEAREST##: 同理
+* [.blue]##GL_NEAREST_MIPMAP_LINEAR##: 同理
+* [.blue]##GL_LINEAR_MIPMAP_LINEAR##: 同理
+
+通过glTexParameteri设置纹理放大和缩小时的采样方式如下:
+
+[source,C++]
+----
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+----
+
+==== 读取和创建纹理
+
+我们首先需要把图片加载到应用里，方便的做法是使用第三方库完成，此处采用stb_image.h
+
+===== stb_image.h
+

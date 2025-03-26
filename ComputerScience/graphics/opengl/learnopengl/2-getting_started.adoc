@@ -1,7 +1,13 @@
 == 开始吧!
 
 include::2.1-OpenGL.adoc[]
+
 include::2.2-creating_a_window.adoc[]
+
 include::2.3-hello_window.adoc[]
+
 include::2.4-hello_triangle.adoc[]
+
 include::2.5-shaders.adoc[]
+
+include::2.6-textures.adoc[]

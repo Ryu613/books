@@ -2,7 +2,7 @@
 
 推荐学习路径:
 
-GAMES101课程 -> 《Computer Graphics(with OpenGL in C++)》 -> GAMES101作业 -> RayTracingSeries -> PBRT or GAMES202
+GAMES101课程(虎书为辅) -> learnopengl(辅以Computer Graphics With OpenGL in C++) -> GAMES101作业 -> RayTracingSeries + RTR -> PBRT + GAMES202
 
 ## [Physically Based Rendering From Theory To Implementation 4ed](pbrt4ed/pbrt4ed.md)
 

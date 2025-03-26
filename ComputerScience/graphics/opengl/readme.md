@@ -1,3 +1,3 @@
 # OpenGL
 
-1. [learn OpenGL](learnopengl/readme.md)
+1. [learn OpenGL](learnopengl/essence.adoc)

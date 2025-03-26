@@ -1,7 +1,7 @@
 = 书架
 :toc:
 :toc-title: 目录
-:toclevels: 2
+:toclevels: 3
 
 *github预览效果不好，请下载后再看*
 
@@ -33,9 +33,9 @@
 
 === AI
 
-==== 人工智能:现代方法
+人工智能:现代方法
 
-==== 动手学深度学习
+动手学深度学习
 
 === 编程语言
 
@@ -49,61 +49,61 @@
 
 == 数学
 
-=== 托马斯微积分
+托马斯微积分
 
-=== 线性代数及其应用
+线性代数及其应用
 
-=== 概率导论(dimitri)
+概率导论(dimitri)
 
-=== 统计学(Freedman)
+统计学(Freedman)
 
-=== 统计学习方法
+统计学习方法
 
 == 物理
 
-=== 费曼物理学讲义
+费曼物理学讲义
 
 == 复杂性科学
 
-=== 复杂(Complexity: A Guided Tour)
+复杂(Complexity: A Guided Tour)
 
 == 天文学
 
-=== 天文学新概论
+天文学新概论
 
 == 神经科学
 
-=== 神经科学原理
+神经科学原理
 
-=== 神经科学：探索脑
+神经科学：探索脑
 
-=== 思考 快与慢
+思考 快与慢
 
-=== Theoretical Neuroscience: Computational and Mathematical Modeling of Neural Systems
+Theoretical Neuroscience: Computational and Mathematical Modeling of Neural Systems
 
-=== Fundamentals of Computational Neuroscience: Third Edition
+Fundamentals of Computational Neuroscience: Third Edition
 
 == 管弦作曲
 
 === 乐理
 
-==== The Complete Idiot's Guide To Music Theory 2ed
+The Complete Idiot's Guide To Music Theory 2ed
 
 === 和声
 
-==== 调性和声及20世纪音乐概述
+调性和声及20世纪音乐概述
 
-==== 和声学基础(斯波索宾)
+和声学基础(斯波索宾)
 
 === 曲式
 
-==== 作曲基本原理(勋伯格)
+作曲基本原理(勋伯格)
 
 === 配器
 
-==== 配器法教程(阿德勒)
+配器法教程(阿德勒)
 
-==== 复调
+=== 复调
 
 == 文学
 

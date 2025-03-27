@@ -105,8 +105,16 @@ The Complete Idiot's Guide To Music Theory 2ed
 
 === 复调
 
-== 文学
+== 人文学科
 
-== 历史
+=== 语言
 
-== 哲学
+==== 英语
+
+. link:Humanities/language/english/英语魔法师/toc.adoc[英语魔法师之语法俱乐部]
+
+=== 文学
+
+=== 历史
+
+=== 哲学

@@ -1,0 +1,265 @@
+= filament设计探索
+
+> 尽量言简意赅，通俗易懂
+
+== 前言
+
+我的目的是通过对filament的学习，了解图形引擎的设计和实现方法，进而提高自己自主研发图形引擎的认识和设计实现能力，此处，自我强调一下是**设计**和**实现**的能力，故此篇文章主要关注**设计思想**和**实现技巧**，不会去一一列举每个功能究竟是做什么和怎么用的
+
+写此文档的目的，是记录和总结对filament的学习过程和成果，方便自研引擎的时候做备忘参考。**记录文档**也可**促进学习的专注和理解**
+
+本人重点是关注Windows+Vulkan的代码，其他平台和图形API暂时不考虑
+
+TLDR: 即太长不看，我后期会整理一份更简要的文档，高度精华总结，文档名称会以TLDR结尾，只记录关键设计思路和核心技巧
+
+link:filament设计探索_TLDR.adoc[Filament设计探索(太长不看版)]
+
+此项目凝聚了众多工程实践精华，由于本人水平有限，很大可能某些解读并不到位，故不可避免会出现遗漏和错误，欢迎指正
+
+== 项目介绍
+
+Filament是由google开发，其是一个实时PBR图形渲染引擎，支持多种平台和设备，高效简洁是其追求
+
+先从github上克隆项目，切换到release版本作为参考基准，我选择1.58.0
+
+下载后重点可看README.md和BUILDING.md, 对项目整体和构建方法有所了解，此处不赘述
+
+此外，可看docs/index.html,此文档是PBR算法原理的极佳学习资料
+
+== 项目结构
+
+重点目录如下:
+
+- assets: 主要是filament的示例需要使用的3D资产
+- build: cmake的build脚本
+- docs: 项目文档
+- filament: 项目主文件夹, 引擎核心代码，主要就是看这个文件夹内的内容
+    - backend: 渲染核心的后端支撑部分，比如对各个图形API的支持
+- libs: 引擎依赖或依赖引擎的库，要么作为引擎部分功能的支撑，要么把引擎代码进一步封装，方便开发时使用，按需查看
+- samples: 示例，看效果和代码调用过程时可以参考
+- shaders: 按需查看
+- third_party: 第三方库
+- tools: 额外的工具，按需查看
+
+[quote,作者]
+如果要搭建一个图形引擎，大体目录结构就可如此般设计，最关键的当属filament, docs, build三个目录，其他目录可自行决定组织方式
+
+项目整体是用CMake管理代码的结构和依赖关系，第三方库是使用git submodule进行管理的，库的编译脚本有些是filament开发者自己写的，文档主要使用markdown编写，代码说明使用doxygen+graphviz实现
+
+[quote,作者]
+doxygen是一个方便实用的代码说明工具，我已在多个开源项目中看到，自己也实践过，其简单易学效果不错，值得使用
+
+[quote,作者]
+有些第三方库不是用CMake构建的，加上项目本身有库的特殊构建需求，故有些库需要/必须手动编写库的构建脚本代码，其实并不方便，如果项目的依赖库要求不多，我个人更推荐使用vcpkg进行三方库管理，若CMake可用高版本，也可使用CMake的Fetchcontent管理三方库
+
+值得一提的是,代码风格统一用了visual studio提供的编辑器自动配置: ".editorconfig"文件，可以在代码文件保存时自动按配置把代码更新为指定格式,此文件很简单实用，配置可参考，如下:
+
+[source]
+----
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+
+[*.{c,cpp,h,inc,kt,java,js,md}]
+indent_style = space
+indent_size = 4
+max_line_length = 100
+----
+
+[quote,作者]
+用.editorconfig管理代码风格，是简单实用的方案，还有另一种:.clang-format文件，这种方式支持的风格配置更多，若代码风格要求不多，使用.editorconfig即可，若较多较复杂，可考虑.clang-format
+
+=== CMake整体配置
+
+根目录下的CMake配置文件，主要就是构建需要的参数，分平台，设备，编译器分别配置，此时暂时不用特别关注具体内容。
+
+主要是在构建项目VS解决方案时，注意选择windows+vulkan即可，此项目推荐使用CLion,若使用VS，则更推荐用cmake生成的解决方案,而不是直接打开此CMake项目
+
+[quote,作者]
+我刚开始查看代码时，使用了VS自带的CMake工具，遇到了部分代码不高亮，无法跳转的问题，改为使用解决方案后，目前正常，个人也推荐用解决方案而不是使用VS自带的CMake项目工具
+
+== 核心类
+
+filament文件夹下，就是引擎核心代码，里面有filament的doxygen配置文档和readme,可用doxygen工具生成代码文档，readme可查看核心代码目录介绍，此处不赘述
+
+[quote,作者]
+里面提到另一个工具graphviz,可生成代码结构的可视化关系图，值得使用
+
+=== 类介绍
+
+核心类的头文件，都放在filament/include/filament文件夹下， 这部分类是公开的，开发者引用类时都是引用此处的类，也代表了引擎最核心的类的抽象设计。
+
+在filament/src下也有很多头文件，这些文件只在引擎代码内部使用，不暴露到外部的使用者，
+
+公开的接口，写在include/下，非公开的，会在src里以同名头文件的方式引入include的公开接口，这样做到了模块级的访问权限隔离
+
+=== Engine
+
+其主要入口是从Engine.h开始，刨去此类暂不用关心的配置项，一个精简后的Engine.h代码如下:
+
+[source,C++]
+----
+class Engine {
+    public:
+        struct Config{
+            // 引擎配置项
+        };
+        class Builder {
+            // 引擎构建类，builder模式的好处就是用链式调用的方式，一次性构建参数多和复杂的类，更直观，构造过程也更方便管理
+        }
+        // 静态的引擎创建函数, 引擎类实例创建入口，需要传入引擎， 由于函数简短，使用了inline关键词在编译时替换为调用的实际代码，减少栈调用开销
+        static inline Engine* create(...) {
+            return Builder()
+                .[...]
+                .build();
+        }
+        // 用于销毁引擎实例
+        static void destroy(Engine* engine);
+        // 各种setter/getter, create方法
+    protected:
+        // 只有派生类能调用并控制Engine的构造和析构过程
+        Engine() noexcept = default;
+        ~Engine() = default;
+    public:
+        // 把拷贝和赋值函数删了，避免意外复制
+        Engine(Engine const&) = delete;
+        Engine(Engine&&) = delete;
+        Engine& operator=(Engine const&) = delete;
+        Engine& operator=(Engine&&) = delete;
+}
+----
+
+设计思想和技巧总结如下:
+
+. 此类严格限制了实例化/销毁方式，开发者必须手动显式通过静态方法构造和销毁，同时不允许通过拷贝和赋值方式构造新的实例，其主要目的是防止由于开发者疏忽，隐式构造或销毁Engine实例，此实例大部分情况下都应该是只需要一个，但没有严格限制只有一个，故不是单例模式
+. 用builder模式方便复杂参数管理和构造的调用
+. create和destroy函数说明此类负责显式管理其他几个关键对象的创建和销毁，这几个关键对象将在后文介绍
+. 函数声明部分带有noexcept关键词，代表某些函数很重要，抛出异常即终结程序，同时优化性能
+
+最小用例代码如下:
+
+[source,C++]
+----
+#include <filament/Engine.h>
+#include <filament/Renderer.h>
+#include <filament/Scene.h>
+#include <filament/View.h>
+
+using namespace filament;
+
+Engine* engine       = Engine::create();
+SwapChain* swapChain = engine->createSwapChain(nativeWindow);
+Renderer* renderer   = engine->createRenderer();
+Scene* scene         = engine->createScene();
+View* view           = engine->createView();
+
+view->setScene(scene);
+
+do {
+    // typically we wait for VSYNC and user input events
+    if (renderer->beginFrame(swapChain)) {
+        renderer->render(view);
+        renderer->endFrame();
+    }
+} while (!quit);
+
+engine->destroy(view);
+engine->destroy(scene);
+engine->destroy(renderer);
+engine->destroy(swapChain);
+Engine::destroy(&engine); // clears engine*
+----
+
+可以看到，Engine类还负责对其他几个核心对象进行创建和销毁：SwapChain, Renderer, Scene, View
+
+在渲染循环中，renderer的render()函数是核心渲染调用
+
+此头文件只包含了允许外部调用者调用的函数，引擎内部调用的函数通过src/detail.h继承Engine.h完成封装，里面定义了FEngine用于声明和定义引擎内部用到的成员和函数，外部使用者无法直接使用这些声明的函数和成员
+
+[quote,作者]
+在include里的头文件，暴露给引擎外部的使用者使用，src里的头文件，是在引擎内部的使用者使用，用这种方式，可完成模块级的访问权限隔离
+
+FEngine继承自Engine,其简略代码如下:
+
+[source,C++]
+----
+class FEngine : public Engine {
+    public:
+        // 重载此类new操作符，传入对齐的字节数，使FEngine实例构造前分配内存时做内存对齐
+        // 推测主要是为了保证跨平台兼容性的防御性编程，与性能优化关系不大
+        // aligned_alloc实现在libs/utils/include/utils/memalign.h
+        void* operator new(std::size_t const size) noexcept {
+            return utils::aligned_alloc(size, alignof(FEngine));
+        }
+        // 重载new要配套delete，避免内存泄漏
+        void operator delete(void* p) noexcept {
+            utils::aligned_free(p);
+        }
+}
+----
+
+====
+简要说明内存对齐：因为CPU访问内存不是按字节，而是一次性存取2,4,8,16个连续字节,如果某个类型的起始地址不是这个一次性存取的字节数的整数倍，那么获取这个类型需要更多次数的获取操作，然后做数据拼接整合，影响性能。内存对齐使类型的起始地址是一次性存取字节数的整数倍，用更少的次数取出需要的值，在某些CPU上，是必须的，也可提高性能(某些现代CPU上内存不对齐不影响性能)
+
+一次性存取几个字节，在gcc通过#pragma pack(n)设定,VS里默认8,通过alignof获取某个类型按几字节对齐
+
+但是此处经过我的调查，很可能此处**不是为了性能优化做的内存对齐**，而是要考虑到众多设备可能的内存对齐要求，防止某些设备运行报错或某些库要求内存对齐，故做了统一按对齐标准值对齐，也可能是遗留代码
+
+ref:
+
+- link:https://www.cnblogs.com/zhao-zongsheng/p/9099603.html[从硬件到语言，详解C++内存对齐]
+- link:https://cloud.tencent.com/developer/article/2474480[C++内存对齐规则]
+====
+
+此头文件的定义在src/Engine.cpp，里面是对各个Engine.h函数的实现，大部分都是通过下方形式完成，并且末尾还有一个宏：
+
+[source,C++]
+----
+downcast(this)->xxxfunc(...)
+
+...
+
+// 此宏把指定类型安全转换到F开头的对应类，主要目的是模块级封装，F开头的类只能引擎模块内部使用，外部不能直接使用
+// src中的头文件若与include里的核心类对应，则都需要在末尾加上
+FILAMENT_DOWNCAST(Engine)
+----
+
+=== SwapChain
+
+此类代表操作系统原生窗口界面对象，对不同平台的窗口的操作做统一封装，过Engine.createSwapChain()传入原生窗口指针，然后根据对应的图形API(比如Vulkan就对应VulkanPlatform::createSwapChain())创建对应的surface和swapchain相关对象(如vulkan的vkSwapchain)
+
+此类继承了FilamentAPI， 这个类是用来保证其派生对象是一个API接口类，不能被调用者创建，销毁和拷贝
+
+对内的头文件在src/SwapChain.h，即FSwapChain,主要成员有Engine的引用，具体的交换链的指针(用类型安全的方式封装),还有窗口系统的原生指针，界面的宽高
+
+简化的FSwapChain如下:
+
+[source,C++]
+----
+class FSwapChain : public SwapChain {
+public:
+    // 此构造器会根据engine使用的图形API，来创建交换链对象，并赋值给mHwSwapChain
+    FSwapChain(...);
+    // 各种具体操作
+private:
+    FEngine& mEngine;
+    // 做了类型安全的处理， HwSwapChain是一个结构体，里面有指向具体交换链对象的指针
+    backend::Handle<backend::HwSwapChain> mHwSwapChain;
+    void* mNativeWindow{};
+    uint32_t mWidth{};
+    uint32_t mHeight{};
+}
+
+=== Renderer
+
+渲染器类，此类负责对View进行渲染及相关的操作
+
+----
+
+== 后端(backend)
+
+== 实现类
+

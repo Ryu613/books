@@ -1,0 +1,23 @@
+= filament设计探索(太长不看版)
+
+> 从filament学到的项目设计思路和实现方法，此文档是主文档的太长不看版，详见link:filament设计探索.adoc[主文档]
+
+== 设计哲学
+
+. KISS原则: 即简单易懂
+
+== 工具关键词
+
+cmake, git submodule, doxygen, graphviz, markdown
+
+=== 根目录结构
+
+. README.md: 写项目介绍
+. BUILD.md: 写构建方法
+. .editorconfig: 简单规定和配置项目整体的代码风格，复杂规则可使用.clang-format
+. 核心代码： 多以项目名命名，如filament/ 
+. 三方库: 常见命名有third_party/, external/, ext/, deps/ 都可
+. 构建脚本: 常见命名有build/, cmake/
+. 项目文档: 多以docs/, doc/ 来命名，推荐用doxygen生成文档配置，可选搭配graphviz,项目的子目录如有必要，也可写readme.md,作为子目录介绍
+. 其他目录: 可在后续开发过程中按需添加
+

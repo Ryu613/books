@@ -41,6 +41,8 @@
 
 ==== C++
 
+. link:ComputerScience/ProgrammingLanguage/C++/深度探索C++对象模型.adoc[深度探索C++对象模型]
+
 === 计算机理论
 
 === 软件工程

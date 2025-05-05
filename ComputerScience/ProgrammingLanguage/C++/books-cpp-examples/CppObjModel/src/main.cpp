@@ -1,4 +1,4 @@
-#include<Common.hpp>
+#include <Common.hpp>
 #include "ClassA.hpp"
 #include "MyObject.hpp"
 #include "ThisPtr.hpp"

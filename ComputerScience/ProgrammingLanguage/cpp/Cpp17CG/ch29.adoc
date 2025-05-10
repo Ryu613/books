@@ -1,1 +1,19 @@
 = 第29章 多态内存管理(PMR)
+
+== 内存资源的抽象
+
+标准内存资源:
+. new_delete_resource()
+. (un)synchronized_pool_resource: 尝试在相邻位置分配所有内存，尽可能减小内存碎片，un开头的是线程不安全的，性能也更好一些
+. monotonic_buffer_resource
+. null_memory_resource()
+
+这几种最好搭配std::pmr下面的各种类型使用最方便
+
+. monotonic_buffer_resource看起来是定义一个buffer资源的，传入你用于buffer的内存的指针地址和大小即可，看起来可以是任意内存的地址，比如栈空间的内存地址
+. 要把这个buf用于标准容器可以在命名空间加上pmr,如std::pmr::vector
+. 如果这个buffer不够用，还会自动继续在堆上分配内存，这是因为
+
+. monotonic_buffer_resource可用来定义缓冲的内存区，结合std::pmr的类型就可实现使用此buffer当作内存分配器
+. std::pmr会对这个buffer传播，如std::pmr::vector<std::pmr::string>,甚至可以做到0次分配
+. 若buffer容量小于需要分配的内存，会使用new，也就是还是会在堆上分配

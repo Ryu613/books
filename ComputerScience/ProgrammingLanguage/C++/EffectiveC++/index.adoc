@@ -28,19 +28,27 @@ Effective {cpp}这本书,不仅在众多{cpp}学习者中广泛推崇, 而且在
 
 * 对于读者(若有)的建议
 
-本文的观点只是个人的理解,若感觉有偏差,还请参考原书, 如果可以直接向我友好地提供建议, 十分欢迎
+本文的观点只是个人的理解,若感觉有偏差,还请参考原书,如果可以直接向我友好地提供建议, 十分欢迎
 ====
 
 :leveloffset: +1
 
 include::part1.adoc[]
+
 include::part2.adoc[]
+
 include::part3.adoc[]
+
 include::part4.adoc[]
+
 include::part5.adoc[]
+
 include::part6.adoc[]
+
 include::part7.adoc[]
+
 include::part8.adoc[]
+
 include::part9.adoc[]
 
 :leveloffset: -1

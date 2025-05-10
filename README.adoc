@@ -18,7 +18,7 @@
 
 == C++
 
-. link:ComputerScience/ProgrammingLanguage/{cpp}/Effective{cpp}/index.adoc[Effective C++]
+. link:ComputerScience/ProgrammingLanguage/cpp/EffectiveCpp/index.adoc[Effective C++]
 
 === 图形学
 
@@ -26,14 +26,14 @@
 
 ==== Vulkan
 
-// . link:ComputerScience/graphics/vulkan/htlv.md[How to learn vulkan]
-// . link:ComputerScience/graphics/vulkan/vpg/vpg.md[Vulkan Programming Guide]
-// . link:ComputerScience/graphics/vulkan/vulkan-cookbook/vcook.md[Vulkan Cookbook]
-// . link:ComputerScience/graphics/vulkan/modern_vulkan_cookbook/mvc.md[Modern Vulkan Cookbook]
+. link:ComputerScience/graphics/vulkan/htlv.md[How to learn vulkan]
+. link:ComputerScience/graphics/vulkan/vpg/vpg.md[Vulkan Programming Guide]
+. link:ComputerScience/graphics/vulkan/vulkan-cookbook/vcook.md[Vulkan Cookbook]
+. link:ComputerScience/graphics/vulkan/modern_vulkan_cookbook/mvc.md[Modern Vulkan Cookbook]
 
 ==== OpenGL
 
-// . link:ComputerScience/graphics/opengl/toc.adoc[Learn OpenGL]
+. link:ComputerScience/graphics/opengl/toc.adoc[Learn OpenGL]
 
 === AI
 
@@ -43,7 +43,7 @@
 
 === 编程语言
 
-==== C++
+==== {cpp}
 
 === 计算机理论
 

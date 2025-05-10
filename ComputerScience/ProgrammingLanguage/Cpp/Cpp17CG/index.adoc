@@ -1,8 +1,10 @@
 = C++ 17 Complete Guide
-:toc:
+:toc: left
 :toc-title: 目录
-:toclevels:2
+:toclevel: 2
 
 :leveloffset: +1
+
 include::ch29.adoc[]
+
 :leveloffset: -1

@@ -1,0 +1,35 @@
+= std::pmr
+
+== pmr::memory_resource
+
+是对可供你使用的内存资源的抽象，是一个基类，具体的内存资源皆从此派生出来，主要就是要定义内存资源如何分配和释放，还有与其他内存资源如何去等效(为了能够支持内存资源的互相替代)
+
+推论::
+. 也就是说，可以用此类去代表任意内存池,这个内存是栈还是对还是静态区还是动态区还是混合的都取决于你
+
+STL里提供了3种内存资源，都继承了此类:
+
+. monotonic_buffer_resource: 仅在资源被销毁时才释放所分配内存，可用作能复用的buffer，线程不安全
+
+.. 如果使用时超出了这个内存资源的大小，程序会自动从std::pmr::get_default_resource()获取默认分配.器进行分配，而不是直接报错或者停止程序
+.. 可调用release()来释放内存，并重置为初始状态，方便复用
+
+. unsynchronized_pool_resource: 是一个池化的内存资源，可以尽量保证内存连续(并不绝对保证)，线程不安全
+. synchronized_pool_resource: 同上，只是线程安全，所以性能低一些
+
+这三种内存资源可以混合使用，比如，用monitonic_buffer_resource来初始化xxx_pool_resource
+
+== pmr::polymorphic_allocator
+
+保存了一个memory_resource的指针，分配内存时，会调用这个指针的虚函数来进行分配
+
+要保证memory_resource的声明周期长于allocator,因为memory_resource是个指针
+
+== pmr容器
+
+在STL中的容器，除了std::array外，都有一个pmr版本的,其实质就是第二个模板参数固定传入了polymorphic_allocator<T>，所以不用显式传入pmr的allocator
+
+== Allocator Aware Software Interface(AASI)
+
+暂略
+

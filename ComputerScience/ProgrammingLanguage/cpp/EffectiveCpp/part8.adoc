@@ -1,0 +1,9 @@
+= 第八部分 自定义new和delete
+
+== 49. 理解new-handler的行为
+
+== 50. 理解什么场景下要替换new和delete
+
+== 51. 当编写new和delete时,要遵守约定
+
+== 52. 写了placement new,就要写placement delete

@@ -1,0 +1,18 @@
+= C++ 17 Complete Guide
+:toc: left
+:toc-title: 目录
+:toclevel: 2
+
+====
+市面上没有好的中文翻译版，故重新手工翻译部分内容，意译为主，省掉了一些不重要的内容(多数是重复或者历史背景的内容)。还添加了本人的总结，应该更加易读。
+
+但是只有部分我需要的内容
+====
+
+:leveloffset: +1
+
+include::ch29.adoc[]
+
+include::ch30.adoc[]
+
+:leveloffset: -1

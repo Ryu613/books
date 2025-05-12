@@ -1,0 +1,140 @@
+= 第30章 支持过度对齐的new和delete
+
+> 过度对齐，即可使数据的对齐尺寸超过std::max_align_t对齐值(WINDOWS上是8，其他平台为8或16)
+
+从C++11开始，你可通过alignas()来定义过度对齐的类型，此种类型具有比默认对齐更大的对齐值:
+
+[source,c++]
+----
+struct alignas(32) MyType32 {
+    int i;
+    char c;
+    std::string s[4];
+};
+
+MyType32 val1; //32字节对齐
+alignas(64) MyType32 val2; // 64字节对齐
+----
+
+注意，对齐值必须是2的幂，且不能把此值设定得比默认对齐值更小(编译器可能会警告，也可能会无视)
+
+然而，在动态内存或堆内存上分配过度对齐的数据，在C++11-14之间是没有被正确处理的。对过度对齐的类型使用new操作符，默认情况下会忽略所要求的对齐值， 意味着比如某个64字节对齐的类型，很可能只有8或16字节的对齐值
+
+这个问题在C++17被解决了，new新加了一个带有对齐参数的重载，允许你自己实现new操作符来支持过度对齐的数据
+
+== 30.1 使用带对齐的new
+
+使用过度对齐的类型，如下所示:
+
+[source,C++]
+----
+struct alignas(32) MyType32 {
+    int i;
+    char c;
+    std::string s[4];
+};
+----
+
+new现在能保证你如果写了alignas, 就能在请求的堆内存上按要求对齐。而在C++17前，并不保证能按要求进行32字节对齐
+
+按照惯例，若没有设定初始化值，那么此对象就是默认初始化的，意味着调用了一个可用的构造器，但是其下属的基础类型对象的值是未定义的。因此，推荐写大括号来进行列表初始化，来保证下属的对象具有其初始值，或0/false/nullptr
+
+[source,C++]
+----
+MyType32* p = new MyType32{}; // 推荐的做法，已对齐并带有正确默认值的初始化
+----
+
+== 30.1.1 对动态内存和堆内存空间的区分
+
+注意，请求已对齐内存时，结果就是获取到相邻的内存空间。因此，针对对齐内存的分配，特别对应了一个释放的方法
+
+然而，对于各种平台来说，由于也允许其他的new和delete，导致了对于默认对齐的数据和过度对齐数据必须调用不同的内部函数，比如，在Windows中，一般使用_aligned_malloc(),对应的释放操作就是_aligned_free()
+
+对比C语言标准来说，C++标准重视此种场景，因此在概念上假设了具有两种相邻，且不可互通的内存空间，其一代表默认对齐的数据，其二代表过度对齐的数据。一般来说编译器知道该如何正确处理它们:
+
+[source,C++]
+----
+std::string* p1 = new std::string; // 用默认对齐的内存进行操作
+MyType32* p2 = new MyType32; // 使用过度对齐的内存进行操作
+...
+delete p1; // 用默认对齐的内存操作
+delete p2; // 用过度对齐的内存操作
+----
+
+然而，一些时候也需要程序员正确操作，详见后文
+
+== 30.1.2 用new表达式来传递对齐值
+
+可用特定的new调用方式来请求已过度对齐的内存，比如:
+
+[source,c++]
+----
+#include <new> // 因为需要align_val_t
+...
+
+std::string* p = new(std::align_val_t{64}) std::string; // 64字节对齐
+MyType32* p = new(std::align_val_t{64}) MyType32{}; // 64字节对齐(注意，原类型声明写的是32)
+----
+
+std::align_val_t可允许你传一个对齐值到new里
+
+=== 用new传递对齐值会影响delete
+
+记住new操作符在C++中可以多种方式实现：
+* 作为全局函数(默认提供多种重载)，可被开发者替换
+* 作为类型限定的实现，可由开发者提供，具有比全局的new重载更高的优先级
+由于使用不同的内存空间用的是不同的new实现，就需要对其特别重视。当用new设定一个特殊的对齐值，编译器不能使用这个类型来知道是否对齐，也不知道请求的对齐值，所以开发者必须指定调用哪个delete
+
+不幸的是，没有placement delete。因此，你必须直接调用对应的delete操作符，这意味着:
+* 你必须知道究竟是哪个new重载被实现，这样你才能调用到正确的那个
+* 调用delete操作符前，必须显式调用析构函数
+
+事实上，你必须先调用析构函数，然后调用全局delete(若没有类型限定的delete时)
+[source,C++]
+----
+std::string* p = new (std::align_val_t{64}) std::string; // 64字节对齐
+p->~basic_string();
+::operator delete(p, std::align_val_t{64});
+----
+
+如果你不知道这个类型的细节，对于类型T的对象，下列函数中的一个可能被调用:
+
+[source,C++]
+----
+// 也就是类型限定的lete有限，参数越多的越优先
+void T::operator delete(void* ptr, std::size_t size, std:;align_val_t align);
+void T::operator delete(void* ptr, std:;align_val_t align);
+void T::operator delete(void* ptr, std::size_t size);
+void T::operator delete(void* ptr);
+void ::operator delete(void* ptr, std::size_t size, std:;align_val_t align);
+void ::operator delete(void* ptr, std:;align_val_t align);
+void ::operator delete(void* ptr, std::size_t size);
+void ::operator delete(void* ptr);
+----
+
+确实看起来有点复杂，下文中会详述，在此处，我推荐你遵守如下规则:
+
+. 不要直接用new进行过度对齐操作，而是封装成helper类型
+. 对同一块内存区，为new和delete都提供实现(以便让直接调用delete总是奏效)
+. 对于这些new操作，提供一个类型限定的delete，可被直接调用，而不是使用delete表达式
+注意，不能用typedef或using
+
+[source,C++]
+----
+using MyType64 = alignas(64) MyType32; // 错误！
+typedef alignas(64) MyType32 MyType64 // 错误!
+----
+
+如果你想调用带对齐的new，当抛出std::bad_alloc时返回nullptr而不是异常，你可以这样做:
+
+[source,C++]
+----
+std::string* p = new(std::align_val_t{64}, std::nothrow) std::string;
+if(p != nullptr) {
+    ...
+}
+----
+
+=== 实现placement delete
+
+== 30.2 为对齐的内存实现new操作符

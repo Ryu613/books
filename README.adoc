@@ -1,5 +1,5 @@
 = 书架
-:toc:
+:toc: left
 :toc-title: 目录
 :toclevels: 3
 

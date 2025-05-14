@@ -16,10 +16,6 @@
 
 == 计算机科学
 
-== C++
-
-. link:ComputerScience/ProgrammingLanguage/cpp/EffectiveCpp/index.adoc[Effective C++]
-
 === 图形学
 
 . link:ComputerScience/graphics/pbrt4ed/pbrt4ed.md[PBR理论与实现第四版]
@@ -44,6 +40,8 @@
 === 编程语言
 
 ==== {cpp}
+
+. link:ComputerScience/ProgrammingLanguage/cpp/EffectiveCpp/index.adoc[Effective C++]
 
 === 计算机理论
 

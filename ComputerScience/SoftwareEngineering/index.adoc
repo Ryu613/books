@@ -2,5 +2,3 @@
 :toc: left
 :toc-title: 目录
 :toclevels: 2
-
-== UML

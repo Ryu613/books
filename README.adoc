@@ -16,6 +16,16 @@
 正在重新整理内容中
 --
 
+// == 计算机
+
+// === 图形学
+
+// . link:ComputerScience/graphics/pbrt4ed/pbrt4ed.md[基于物理的渲染:设计与实现 第四版]
+// . link:ComputerScience/graphics/vulkan/htlv.md[How To Learn Vulkan]
+// . link:ComputerScience/graphics/vulkan/vpg/vpg.md[Vulkan Programming Guide]
+
+// === {cpp}
+
 // == 计算机科学
 
 // === link:ComputerScience/graphics/index.adoc[图形学]

@@ -16,18 +16,22 @@
 正在重新整理内容中
 --
 
-== 计算机科学
+// == 计算机科学
 
-=== link:ComputerScience/graphics/index.adoc[图形学]
+// === link:ComputerScience/graphics/index.adoc[图形学]
 
-=== link:ComputerScience/AI/index.adoc[AI]
+// === link:ComputerScience/AI/index.adoc[AI]
 
-=== link:ComputerScience/ProgrammingLanguage/cpp/index.adoc[{cpp}]
+// === link:ComputerScience/ProgrammingLanguage/cpp/index.adoc[{cpp}]
 
-=== link:ComputerScience/SoftwareEngineering/index.adoc[软件工程]
+// === link:ComputerScience/SoftwareEngineering/index.adoc[软件工程]
 
 // == link:Math/index.adoc[数学]
 
 // == link:NeuroScience/index.adoc[神经科学]
 
 // == link:Physics/index.adoc[物理]
+
+// == link:OrchestralComposition/index.adoc[管弦作曲]
+
+// == link:misc/index.adoc[其他]

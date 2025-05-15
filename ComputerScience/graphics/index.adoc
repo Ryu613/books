@@ -1,0 +1,36 @@
+= 图形学
+
+== link:pbrt4ed/pbrt4ed.md[Physically Based Rendering From Theory To Implementation 4ed]
+[NOTE]
+====
+* 本书是进阶书籍，不适合入门阅读
+* link:https://github.com/Ryu613/pbrt-v4-digest-cn[pbrt-v4-digest-cn]本书附带代码补充了一些注释
+====
+
+// == link:rtr4/rtr4.md[Real-Time Rendering, Fourth Edition]
+// [NOTE]
+// ====
+// * 省略了较为基础的内容，对原书内容进行了重新总结
+// ====
+
+// == [GAMES202:高质量实时渲染](GAMES202/GAMES202.md)
+
+// == [Google Filament Doc](filament/official_doc.md)
+
+// == Vulkan
+
+// == [A trip through the Graphics Pipeline](tripToGP.md)
+
+// > 推荐阅读： 图形管线之旅
+
+// == [Google Filament Doc](filament/official_doc.md)
+
+// > 来自google的著名实时PBR渲染系统Filament的官方文档
+
+// == [vulkan](vulkan/readme.md)
+
+// vulkan相关的资料整理在此
+
+// == [OpenGL](opengl/toc.adoc)
+
+// OpenGL笔记

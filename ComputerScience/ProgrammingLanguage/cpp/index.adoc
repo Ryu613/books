@@ -1,0 +1,3 @@
+= {cpp}
+
+== link:EffectiveCpp/index.adoc[Effective {cpp}]

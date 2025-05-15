@@ -18,107 +18,16 @@
 
 == 计算机科学
 
-=== 图形学
+=== link:ComputerScience/graphics/index.adoc[图形学]
 
-. link:ComputerScience/graphics/pbrt4ed/pbrt4ed.md[PBR理论与实现第四版]
+=== link:ComputerScience/AI/index.adoc[AI]
 
-==== Vulkan
+=== link:ComputerScience/ProgrammingLanguage/cpp/index.adoc[{cpp}]
 
-. link:ComputerScience/graphics/vulkan/htlv.md[How to learn vulkan]
-. link:ComputerScience/graphics/vulkan/vpg/vpg.md[Vulkan Programming Guide]
-. link:ComputerScience/graphics/vulkan/vulkan-cookbook/vcook.md[Vulkan Cookbook]
-. link:ComputerScience/graphics/vulkan/modern_vulkan_cookbook/mvc.md[Modern Vulkan Cookbook]
+=== link:ComputerScience/SoftwareEngineering/index.adoc[软件工程]
 
-==== OpenGL
+// == link:Math/index.adoc[数学]
 
-. link:ComputerScience/graphics/opengl/toc.adoc[Learn OpenGL]
+// == link:NeuroScience/index.adoc[神经科学]
 
-=== AI
-
-人工智能:现代方法
-
-动手学深度学习
-
-=== 编程语言
-
-==== {cpp}
-
-. link:ComputerScience/ProgrammingLanguage/cpp/EffectiveCpp/index.adoc[Effective C++]
-
-=== 计算机理论
-
-=== 软件工程
-
-=== 其他
-
-== 数学
-
-托马斯微积分
-
-线性代数及其应用
-
-概率导论(dimitri)
-
-统计学(Freedman)
-
-统计学习方法
-
-== 物理
-
-费曼物理学讲义
-
-== 复杂性科学
-
-复杂(Complexity: A Guided Tour)
-
-== 天文学
-
-天文学新概论
-
-== 神经科学
-
-神经科学原理
-
-神经科学：探索脑
-
-思考 快与慢
-
-Theoretical Neuroscience: Computational and Mathematical Modeling of Neural Systems
-
-Fundamentals of Computational Neuroscience: Third Edition
-
-== 管弦作曲
-
-=== 乐理
-
-The Complete Idiot's Guide To Music Theory 2ed
-
-=== 和声
-
-调性和声及20世纪音乐概述
-
-和声学基础(斯波索宾)
-
-=== 曲式
-
-作曲基本原理(勋伯格)
-
-=== 配器
-
-配器法教程(阿德勒)
-
-=== 复调
-
-== 人文学科
-
-=== 语言
-
-==== 英语
-
-. link:Humanities/language/English/英语魔法师/toc.adoc[英语魔法师之语法俱乐部]
-
-=== 文学
-
-=== 历史
-
-=== 哲学
+// == link:Physics/index.adoc[物理]

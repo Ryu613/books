@@ -1,0 +1,18 @@
+= 神经科学
+
+也包括心理学，认知科学等
+
+== 神经科学原理
+
+== link:神经科学-探索脑/神经科学-探索脑.md[神经科学：探索脑]
+
+== link:思考快与慢/思考，快与慢.md[思考 快与慢]
+
+== Theoretical Neuroscience: Computational and Mathematical Modeling of Neural Systems
+
+== Fundamentals of Computational Neuroscience: Third Edition
+
+== 参考资料
+
+. link:https://zhuanlan.zhihu.com/p/271676465[神经科学教材]
+. link:https://zhuanlan.zhihu.com/p/275642796[计算神经科学]

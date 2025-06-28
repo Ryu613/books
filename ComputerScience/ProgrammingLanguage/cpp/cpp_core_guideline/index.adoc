@@ -1,0 +1,14 @@
+= {cpp} core guideline
+:toc: left
+:toc-title: 目录
+
+====
+只记录本人觉得有意义和印象深刻的部分
+====
+
+:leveloffset: +1
+
+include::ch2.adoc[]
+
+:leveloffset: -1
+

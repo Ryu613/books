@@ -109,6 +109,68 @@ buffer的创建很简单，但是上表有助于在创建和设置buffer时，�
 
 用VMA创建buffer很简单：
 
+. 创建VkBufferCreateInfo
+. 创建VmaAllocationCreateFlagBits
+. 调用vmaCreateBuffer
+. 如果需要调试或优化，调用vmaGetAllocationInfo获取VmaAllocationInfo
+
+== 把数据上传到buffer
+
+把数据从app上传到GPU里的方式，是根据buffer的类型得来的。对于host-visible的buffer，可直接用memcpy来拷贝内存。对于device-local的buffer，我们需要一个暂存buffer(staging buffer), 这个buffer对于CPU和GPU来说都是可见的。在此菜单中，我们会演示如何从app传输到device-visible的内存中（这种buffer的内存区域在设备上）
+
+=== 准备
+
+如果你看不懂上文，请参考"理解Vulkan的内存模型"这一章节
+
+=== 如何做
+
+数据的上传方式取决于buffer的类型:
+
+. 对于host-visible的内存，使用vmaMapMemory来获取目标内存的指针，然后用memcpy拷贝数据到其上即可。这个操作是同步的，所以已被map了的指针，只要memcpy返回后即可被unmap
+当host-visible的buffer创建后立即map其上，除非销毁，否则不再改动这个已map的指针是被推荐的做法，这样做不会导致每次需要更新时，map操作的开销。
+. 把数据上传到device-local的内存中，需要两步:
+.. 先把数据拷贝到host可见的内存上(staging buffer)
+.. 然后从staging buffer拷贝到device-local的内存上，是用vkCmdCopyBuffer,如下图所示，注意，这么做需要有一个command buffer
++
+image::img/fg2_4.png[]
++
+. 一旦数据移动到了device中的host-visible buffer(staging buffer), 就可用VkCmdCopyBuffer来把数据从staging buffer拷贝到device-local的内存上
+
+[NOTE]
+====
+. 如果用host-visible的内存做buffer，那么直接调用vmaMapMemory把指针map到这块内存上，然后memcpy，unmap操作可以在销毁时再做，可减少buffer更新时，重复map/unmap的操作
+. 对于device-local类型的内存做buffer,先把数据拷贝到staging buffer(host-visible)，再从staging buffer拷贝到device-local的内存
+. 使用VMA时，buffer的分配和map/unmap调用改为使用vma开头的api，其他操作类似
+====
+
+== 创建一个staging buffer
+
+创建staging buffer与创建一个普通的buffer类似，但是需要flags设定为host-visible,在此菜单中，我们会展示如何创建一个buffer，来作为staging buffer使用。 这种buffer可以被用作从app传输数据到device-local内存的中转
+
+=== 准备
+
+参考creating buffer这一章节
+
+=== 如何做
+
+VkBufferCreateInfo的usage需要包含VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 因为他需要可以作为vkCmdCopyBuffer指令的数据源
+
+staging buffer最好在你的app里进行封装实现。这个封装类可以对buffer的大小根据情况缩容或扩容。可能对于你的app只需要一个staging buffer就足够了。但是在某些系统架构上，内存的要求可能不一，需要注意。
+
+== 如何使用ring buffer来避免数据竞争
+
+当每一帧的buffer需要更新时，我们可能会遇到数据竞争的风险。如下图所示，数据竞争就是一种场景，在一个程序的多个线程并发访问共享的数据的时机，有至少一个线程正在执行写入的操作。这种并发访问，由于操作顺序的不确定，可导致不可预见的行为。比如，一个uniform buffer存储了view, model和视口的矩阵，并且需要在每一帧进行更新。buffer会在第一个指令缓冲记录时被更新并初始化成v1。一旦指令缓冲在GPU上开始处理，buffer包含了正确的数据：
+
+image::img/fg2_5.png[]
+
+在第一个在GPU上的指令缓冲开始执行后，app可能会在GPU访问的途中尝试更新buffer的内容，变成v2
+
+[NOTE]
+====
+就是说，在CPU再往内存写数据时，GPU可能也正在读，有可能会出现GPU没有读到期望的数据，而是CPU后续写的数据(因为GPU真正执行的过程是异步的)
+====
+
+
 
 
 

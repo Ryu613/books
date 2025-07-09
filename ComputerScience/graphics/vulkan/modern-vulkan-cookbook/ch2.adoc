@@ -170,8 +170,212 @@ image::img/fg2_5.png[]
 就是说，在CPU再往内存写数据时，GPU可能也正在读，有可能会出现GPU没有读到期望的数据，而是CPU后续写的数据(因为GPU真正执行的过程是异步的)
 ====
 
+=== 准备
 
+同步机制显然是Vulkan中最难的一个方面。若过量使用诸如semaphore, fence,和barrier，那么你的app会变成串行执行的，并且没有发挥CPU和GPU的并行处理的潜力。
 
+确保你也读过第一章的"理解swapchain中的同步机制-fence和semaphore"，那个章节和本章节只介绍了同步机制表面上的处理方法，但是作为起始点来说很不错
 
+ring-buffer的实现是在EngineCore::RingBuffer中，其中包含了一个由多个可配置的下属buffer组成的整体。这个RingBuffer的下属buffer都是host-visible且可保持状态的buffer，就是说，这些buffer会在创建后保持已map的状态，以便于访问buffer中的数据
+
+=== 如何做
+
+有一些方法可避免这个(数据竞争的)问题，但是最简单的一种，是创建一个ring buffer，这个ring buffer里包含几个buffer(或者还有其他一些资源)，buffer的数量与在in flight中的帧的数量一致。图2.6展示了当两个buffer可用时的场景。一旦第一个command buffer已被提交并且正在GPU中处理时，app可以在闲时把buffer的copy1进行处理，这时候copy1还没被device访问到
+
+image::img/fg2_6.png[]
+
+[NOTE]
+====
+就是拷贝多份数据(资源)，避免数据竞争
+====
+
+即便此方法是一种简单的解决方案，也有一个值得注意的点：如果允许部分更新，就必须在buffer更新时做出处理。考虑图2.图例的ring buffer包含了被部分更新的子区域。这个buffer存储了view, model, viewport的矩阵，在初始化时，三个子区域都被初始化成三个独立的矩阵，在Frame 0，这时buffer 0是启用状态，model矩阵被更新，包含了一个平移(10,10,0)的变换，在下一帧,即Frame 1, Buffer 1变成启用状态，然后viewport矩阵被更新, 由于Buffer 1已被初始化为3个独立的矩阵，只更新viewport矩阵会让buffer0和1不同步(也包括Buffer 3), 为了保证这样的部分数据更新有效，我们需要把最后一个在用的buffer，即Buffer 0 拷贝到buffer 1, 然后再更新viewport矩阵
+
+image::img/fg2_7.png[]
+
+[NOTE]
+====
+拷贝多份资源也带来了资源的同步问题，故需要在切换资源副本时，先做同步，把上一次的最新数据拷贝到当前要用的资源副本上，还要用不同的指令缓冲录制和提交指令
+====
+
+== 设置管线屏障(pipeline barrier)
+
+在Vulkan中，当指令缓冲被处理时，指令的顺序有可能会根据某些约束被重排，这被称为指令缓冲重排，这种操作通过允许驱动优化指令的执行顺序来优化性能。
+
+好消息是，Vulkan提供了一种叫pipeline barrier的机制来保证每条指令能按正确的顺序执行。这种机制是在指令之间显式设定依赖来使用的，可防止这些指令被重排，并且设定哪些阶段可以同时进行。这个菜单会解释什么是管线屏障，及其属性的含义。同时也会为你展示如何创建和安装管线屏障
+
+=== 准备工作
+
+考虑以下两个绘制指令的调用序列。第一个draw会写入一个颜色附件，这时第二个draw会在fragment shader里，从这个附件里进行采样:
+
+[source, c++]
+----
+vkCmdDraw(...); // 写入到color attachment 0
+vkCmdDraw(...); // 从color attachment 0 读取
+----
+
+图2.8可视化了这个过程，展示了这两个指令如何被device所处理。在图中，指令从上至下进行处理，管线执行则是从左往右。时钟周期是一个松散的项，因为这个处理过程可能要多个时钟周期，只是用来表示一般来讲的执行过程的先后顺序
+
+在此例中，第二个vkCmdDraw会在C2开始执行，即在第一个draw的调用之后进行。这个偏移的时间量还不够长，因为第二个绘制指令的调用需要从frament shader的color attachment中读取数据，此时第一个draw指令还没到color attach output的阶段，如果没有同步机制，这种配置就会导致数据竞争:
+
+image::img/fg2_8.png[]
+
+管线屏障是一种特性，其会被录入到指令缓冲中，用来设定在哪个管线阶段需要执行完屏障前的所有指令，然后才能使指令缓冲继续处理。在屏障前的录入的指令叫做首次同步域或者首次域，在屏障后录入的指令叫做第二次同步域或二次域
+
+屏障也可更加精细化的控制同步过程，只需设定在哪个(管线)阶段的指令必须等待屏障前的指令执行完即可。原因是在二次域的指令不需要等待首次域的指令全部结束才能执行，而是可以根据屏障设定的条件下，尽早执行。
+
+在图2.8的例子中，在首个域中，需要把attachment写入,才能让第二次draw的调用可以访问这个attachment。第二次draw的调用，不需要等第一次draw执行完color attach output阶段才执行，而是可以立即执行，直到fragment阶段的color attach output完成，就可继续
+
+image::img/fg2_9.png[]
+
+有三种类型的屏障:
+
+. **Memory barriers**: 全局屏障，可被应用于在首个和二次域的所有指令
+. **Buffer memory barriers**: 只在buffer上的一部分进行访问的指令上生效，可以指定在buffer的哪部分上生效
+. **Image memory barriers**: 这种类型的屏障只在访问某个image的subresource时生效。可以根据mip level，image的区域，或layer数组来添加屏障。这是一个特别重要的屏障类型，因为此屏障也可用作把一个image转换成另一种image的布局时使用。比如，当从某个mip level生成mipmap和按位传输(blitting)时, 每个level需要是正确的布局。之前的level需要是VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL的布局, 而之后的mip level因为要写入，需要是VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL的布局
+
+[NOTE]
+====
+* 屏障可以控制指令的执行顺序，屏障是录入到指令缓冲中的，代表品璋前的指令需要全部完成，才能执行屏障后的指令
+* 屏障还可以设定是在哪个管线的阶段生效，这样可以最大化并行过程，用得好有助于提高性能
+* 三种屏障类型区别就在于生效的范围，第一种所有类型，第二种只在buffer的一部分生效，第三种只在image的subresource生效
+====
+
+=== 如何做
+
+管线屏障用vkCmdPipelineBarrier指令来录入，可同时提供多种类型的多个屏障。下面的代码片段展示了如何创建一个屏障，用来根据图2.9，在两个draw指令之间添加依赖关系
+
+管线屏障有点晦涩但绝对是Vulkan的基础。确保你理解了它们，并且知道如何操作，然后再阅读后续菜单
+
+== 创建images(texture)
+
+image是用来存储一维，二维或三维数据的，然而大部分是用来存储二维数据。与buffer不同的是，image在内存布局上是做了局部化优化的。这是由于大多GPU具有固定功能的纹理单元或采样器，这些东西从image的纹素数据中读取数据，并且在其上应用过滤器及其他操作，来产出最终的颜色值。image可以有不同的格式，比如RGB, RGBA, BGRA等等
+
+在Vulkan中，image对象只是元数据(metadata)。其数据是分开存储的，创建过程与buffer类似
+
+image::img/fg2_10.png[]
+
+Vulkan中的image不能被直接访问，只能依赖于image view来访问。image view是一种访问image的一部分数据的方式，其通过设定subresource的范围来实现，也包括aspect(哪一方面的image)(比如color或depth),和mip level,还有array layer的范围
+
+另一个关于image的十分重要的方面就是它们的布局(layout)。其被用于在vulkan中设定某个image资源的用途，比如作为传输操作的源(source)或是目的(destination), 或者用于在渲染中的color或depth附件， 或者作为着色器读写的一种资源。正确的image布局是重要的，因为其保证了GPU能够根据用途来高效访问并操作image的数据。使用错误的image布局会导致性能问题或者渲染的瑕疵，并且也可导致未定义的行为。因此，在Vulkan的app中，正确设定每个image的布局是十分必要的。一般的image布局是未定义的(VK_IMAGE_LAYOUT_UNDEFINED), 颜色附件是(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL), 深度/模板附件是(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL), 着色器读是(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)。 image的布局转换是在vkCmdPipelineBarrier指令中的一部分
+
+在此菜单中，你会学到如何在某个device上创建image
+
+=== 准备
+
+在VulkanCore::Texture类中，我们封装了关于image和image view复杂的管理过程，提供了对于Vulkan处理纹理的深度的解决方案。从便利高效地上传数据，到image布局和生成mipmap的处理，Texture类使我们可以无缝的集成到Vulkan的例子中
+
+=== 如何做
+
+创建一个image需要一些基础信息，比如type(1D,2D,3D), size, format(RGBA, BGRA等), mip level的数量, layer的数量等(cubemap的面)
+
+[NOTE]
+====
+* image可用来存储1，2，3维数据，内存是做了局部性优化的，一般用来存储2D纹理信息
+* image对象本身只有元数据，实际的数据是分开存储的, 不能直接访问，必须通过image view
+* image的布局必须设定正确
+====
+
+== 创建一个image view
+
+image view提供了一种根据size, location, format而无关于布局的来解读image的方式。image view需要被显式转换使用image屏障来传输，在此菜单中，你会学到如何在vulkan中创建一个image view
+
+=== 准备
+
+image view通过VulkanCore::Texture类来存储并管理
+
+=== 如何做
+
+创建一个image view很简单，你要做的所有事就是拿到image的句柄，和要代表的image的区域
+
+没有image view，纹理就不能被着色器使用，甚至在image当作颜色附件时，也需要image view
+
+== 创建一个采样器
+
+Vulkan中的采样器不止是一个简单的对象，还是一个介于着色器执行和image数据之间的重要桥梁。除了插值以外，还可以管理过滤操作，寻址模式，和mipmap操作。过滤器代表了在纹素之间的插值法，寻址模式控制坐标系如何与image的尺寸范围做映射。各向异性过滤大幅增强了采样的逼真程度。mipmap，是往下采样后的image的三角级别，也是采样器的另一个方面。简要来说，创建一个采样器涉及到如何把这些image数据的属性和复杂的着色器数据无缝且和谐的组织起来。在此菜单中，你会学到如何创建一个采样器对象
+
+=== 准备
+
+采样器是通过VulkanCore::Sampler类来实现的
+
+=== 如何做
+
+采样器的属性定义了在管线中的一个image的数据如何被解读，一般来说是用在着色器里的数据。处理过程十分简单，初始化一个VkSamplerCreateInfo结构体，然后调用vkCreateSampler即可
+
+采样器是Vulkan中其中一个最简单的对象，也是最容易理解的，因为其描述了计算机图形学中最通用的一些概念
+
+== 为着色器提供数据
+
+从你的app中提供数据，让着色器使用，是Vulkan里最麻烦的事情之一，需要多个步骤，并且顺序和参数要正确。在这个菜单中，会包含几个小菜单，你会学到如何为着色器提供数据，比如纹理，缓冲，和采样器
+
+=== 准备
+
+被着色器消费的资源是用layout关键词来设定的，其带着set和binding的限定词
+
+[source,glsl]
+----
+layout(set = 0, binding=0) uniform Transforms
+{
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+} MVP;
+----
+
+每个资源都通过binding来代表， set就是一组binding的标识，一个binding不一定只代表一种资源，也可以代表同类型的一组资源
+
+=== 如何做
+
+把资源提供并输入给着色器分为以下多个步骤:
+
+. 使用descriptor set layout设定set和binding，这个步骤不涉及真实的资源，只是设定在set中binding的类型的数目
+. 构造一个pipeline layout, 这个对象描述了在管线中用到哪些set
+. 创建一个 descriptor pool, 可以提供descriptor set的实例。descriptor pool包含了根据binding类型分组的binding的数量的清单(纹理，采样器， shader storage buffer(SSBO), uniform buffer)
+. 使用vkAllocateDescriptorSets从pool里分配descriptor set
+. 使用vkUpdateDescriptorSets来把资源进行绑定，这个步骤中，我们会把真实的资源(buffer, texture等)绑定起来
+. 在渲染期间，使用vkCmdBindDescriptorSet,把descriptor set及其绑定的资源，绑定到管线上。此步骤使之前绑定好的set和binding可使当前管线中的着色器中可用
+
+下文的菜单会为你展示每一步骤如何做
+
+== 用descriptor set layout设定descriptor
+
+考虑下方的GLSL代码，此代码设定了一些资源:
+
+[source,glsl]
+----
+struct Vertex {
+    vec3 pos;
+    vec2 uv;
+    vec3 normal;
+};
+layout(set = 0, binding=0) uniform Transforms
+{
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+} MVP;
+layout(set = 1, binding = 0) uniform texture2D textures[];
+layout(set = 1, binding = 1) uniform sampler samplers[];
+
+layout(set = 2, binding = 0) readonly buffer VertexBuffer
+{
+    Vertex vertices[];
+} vertexBuffer;
+----
+
+这个代码要求三个set(0,1,2), 所以我们需要创建三个descriptor set layout,在此菜单中，你会学到如何为之前的代码创建descriptor set layout
+
+=== 准备
+
+descriptor set及其bingding是被VulkanCore::Pipeline类所管理。Vulkan中的descriptor set扮演了一个持有各种资源，比如buffer, texture, sampler的容器，这些资源是给着色器使用的。 binding代表了把这些descriptor set与特定的着色器阶段关联的过程，可在渲染时，让着色器和资源之间进行无缝使用。这些descriptor set可视作某种网关，让资源无缝绑定到着色器的阶段上，让数据和着色器执行之间协调的组合到一起。为了更好的协同，这个类简化了descriptor set的创建和管理操作，通过函数去在Vulkan的渲染管线中完成资源的绑定操作
+
+[NOTE]
+====
+descriptor set代表了一组可被shader使用的同类型的资源的描述，可把资源绑定到特定着色器上
+====
+
+== 如何做
+
+descriptor set layout是通过vkDescriptorSetLayout来设定binding(序号，类型)的。每个binding是用vkDescriptorSetLayoutBinding来描述。之前的着色器代码对云国的Vulkan的descriptor set layout的关系如下图2.11
 
 

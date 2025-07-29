@@ -1,0 +1,3 @@
+= glTF的基本结构
+
+glTF的核心是一个JSON文件，meshes节点包含了场景所有的mesh

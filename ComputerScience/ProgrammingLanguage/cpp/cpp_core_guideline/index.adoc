@@ -6,6 +6,8 @@
 只记录本人觉得有意义和印象深刻的部分
 
 基于Rainer Grimm写的书
+
+第一遍先速读，把所有条款看一遍，然后筛选出有启发的和暂时不懂的部分即可
 ====
 
 :leveloffset: +1
@@ -19,6 +21,8 @@ include::ch4.adoc[]
 include::ch5.adoc[]
 
 include::ch6.adoc[]
+
+include::ch7.adoc[]
 
 :leveloffset: -1
 

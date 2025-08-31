@@ -4,26 +4,45 @@
 
 此处对其进行进一步总结
 
-## 逻辑图形管线
+## 图形管线
 
-逻辑图形管线就是指Vulkan生成图像过程的处理流程在逻辑上的结构，此种逻辑的实现是在VkGraphicsPipeline类中。
+1. 为什么要有
 
-管线其实就是流程的意思，流程分为多个步骤，每个步骤之间首尾相接，上个步骤的输出对应下个步骤的输入。有些步骤是可选的，有些步骤是必须的，某些步骤你可以通过编程去自定义，某些步骤却不行
+主要是给出更多标准化的显示相关的处理过程和操作信息，方便硬件厂商在实现vulkan时，决定哪部分功能应该用固定功能的硬件，哪部分要用到处理器核心
+
+2. 是什么
+
+就是把数据转成image的处理流程的描述，把这个流程看作由首尾相接的单向阶段组成，每个阶段做不同的事情，上个阶段的输出是下个阶段的输入，最开始输入顶点，最终输出图像(图片)
 
 ![图7.1](img/fg7_1.png)
 
-图形管线要执行，需要定义每个步骤输入输出的数据格式和步骤，这是通过称为renderpass的对象实现的，每个renderpass有>=1个subpass，每个subpass对应一个或多个graphics pipeline
+个人总结如下:
 
-图形管线中，最重要的阶段就是顶点着色阶段，这个阶段负责把顶点数据输入并处理，最简单的图形管线也至少必须有一个顶点着色阶段
+![图形管线](img/vulkan_graphics_pipeline.png)
 
 ## 渲染通道(renderpass)
 
-管线只负责把顶点按要求处理"一趟",有时候处理一趟没法最终生成图像，器上有个更大的概念叫renderpass，代表了生成图片的整个过程，这个过程又可分为多个subpass（子过程），一个子过程可对应一个或多个管线。每个过程需要定义这些管线输入输出数据的格式标准。
+1. 为什么要有
 
-在绘制操作开始前，必须有一个renderpass
+方便定义渲染步骤，确保最终得到每帧显示的图像
+
+2. 是什么
+
+- Render Pass是对一帧渲染流程的描述，由一个或多个Subpass组成
+- subpass描述renderpass中的其中一个步骤要对哪些attachment进行哪种操作，还有给出subpass之间的依赖关系
+- 在graphics pipeline建立前需要先建立renderpass，这样渲染管线才知道要渲染到哪个地方， app至少要有一个renderpass，renderpass至少要有一个subpass
 
 ## 帧缓冲(framebuffer)
 
-就是图形管线的渲染目标，这个缓冲里面就是一组图像，管线就在这些图像上"绘画"
+1. 为什么要有
 
-## 流程
+确认Render Pass要用到的attachment，并将这些image view打包成GPU可用的渲染目标集合，方便硬件高效管理显存和访问
+
+2. 是什么
+
+包含最终显示用的swapchain image view，以及深度/模板或其他辅助的image view，打包集中起来供Render Pass的Subpass访问
+
+3. 怎么做
+
+- 创建时主要需要给出关联的renderpass，和这个framebuffer包含哪些attachment(其实就是image view)
+- 每个swapchain image view通常对应一个framebuffer

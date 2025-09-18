@@ -1,3 +1,5 @@
 = {cpp}
 
 == link:EffectiveCpp/index.adoc[Effective {cpp}]
+
+== link:cpp_core_guideline/index.adoc[{cpp} Core Guideline]

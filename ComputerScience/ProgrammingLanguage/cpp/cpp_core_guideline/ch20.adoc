@@ -1,0 +1,7 @@
+= 第二十章 guidelines支持库
+
+Microsoft/GSL
+
+== 其他
+
+. {cpp}20 concept, {cpp}23契约

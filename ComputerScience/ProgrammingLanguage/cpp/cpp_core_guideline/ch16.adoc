@@ -1,0 +1,15 @@
+= 第十六章 标准库
+
+== 重点
+
+. using namespace std::string_literals方便使用string字符串字面量
+
+== 值得一提
+
+. 优先使用std array, vector, 若没有特别理由，优先vector
+. 优先使用iostream而不是c的io库，避免每个字符的操作，不直观简单
+. 避免使用endl而是用'\n',这会写一个换行符并且刷新输出缓冲，这个操作有性能代价,作者自测性能差大概10-20%（500次迭代）
+
+== 待探讨
+
+. string_view的使用

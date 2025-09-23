@@ -1,0 +1,27 @@
+= 第一章 标准库介绍
+
+== 重点
+
+. STL由三部分组成：容器（containers），算法(algorithms)，和链接两者的迭代器(iterators)
+. 容器
+.. 顺序容器
+... vector: 95%的情况下，std::vector是正确选择，性能出色，动态调整大小，自动管理内存
+... array: 唯一不能在运行时调整大小的容器，但是针对最小内存和性能开销进行了优化
+... deque: 队列，新元素一般放在开头
+... list: 双向链表
+... forward_list: 单向链表
+.. 关联容器
+... 有序关联容器
+.... set: 去重元素
+.... map: 键值对
+.... multiset: 
+.... multimap: 可有相同键的map
+... 无序关联容器: 上述关联容器，但是不关心元素顺序
+.... unordered_set
+.... unordered_map
+.... unordered_multiset
+.... unordered_multimap
+. 95%的情况下，std::vector是正确选择，性能出色，动态调整大小，自动管理内存，std::array不能在运行时调整大小，但是针对最小内存和性能开销进行了优化
+. 95%情况下，若不需要排序键，关联容器里unordered_map是首选，一般无需容器性能优于有序
+. **容器适配器**: 为序列容器提供了一个简化的接口，比如std::stack, queue, priority_queue
+. **view(视图)**: 用于高性能需求下只读不改的场景，此类型不拥有数据，支持的类型有:c数组，std::array,std::vector,std::string, 其中std::span是连续顺序元素的一个view

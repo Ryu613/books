@@ -1,0 +1,5 @@
+= 第六章 容器的适配器
+
+. std::stack, std::queue, std::priority_queue是基于基本容器类型进一步实现特殊需求的类，故称为适配器
+看名字就知道功能，分别是栈，队列，带优先级的队列
+. {cpp}23里还有flat_map, flat_multimap, flat_set, set_multiset，带flat的版本叫做平序，不同地方在于内存占用少，读取速度快，支持随机访问的迭代器，具体待探讨

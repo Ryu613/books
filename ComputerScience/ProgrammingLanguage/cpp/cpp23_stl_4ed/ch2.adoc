@@ -1,0 +1,41 @@
+= 第二章 实用工具
+
+== 重点
+
+. type_traits: 在编译时检查，比较，修改类型，运行时无开销，用于提高性能和保证类型按预期正确,我感觉一般也使用在类或函数模板中
+.. 与static_assert配合很强大
+.. 用一系列is_xxxx来保证类型是否是某种类型，详见cpp reference
+. any,optional,variant
+.. any: 任何可复制构造类型的一个值，类型安全,在头文件<any>中，要重新获得元素类型，用std::any_cast<X>()，生成用make_any
+.. optional: 有没有值的封装,在<optional>,可用make_optional封装某个值
+.. variant: 一组类型安全的值，是一个union，用get<Type>或get<index>获取该类型的类型和值
+... 还可用std::visit执行可调用对象
+. expected: 存储两个值里任意一个,std::expected<T,E>: 表达的语义类似：返回一个要么T,要么E的类型，在<expected>里
+
+== 值得一提
+
+. utility里的
+.. std::move: 对象会被转为右值引用，若移动语义不能应用，则会回退为复制语义
+.. std::forward: 不改变函数入参语义(左值右值，类型，指针)，一般用于模板函数把入参转发给其他函数处理时使用
+.. std::pair: 两个值看作一对，用于灵活传值，但是可读性又不如struct,不要滥用，可用make_pair生成任意类型的pair
+.. tuple: pair的2个以上元素版,也有个make_pair
+. memory里的
+.. 三个智能指针，其用RAII实现，也可用作实现RAII的一种类型，不必详述
+. min, max, minmax(返回一个pair,依次是最小，最大值)
+. midpoint(<numeric>取两点的中点), lerp(<cmath>线性插值)
+. cmp_系列,在<utility>里，可对整数安全比较(有符号和无符号数之间，若是以外的类型，会在编译时报错)
+. <utility>中的std::swap, 可交换两对象，内部使用的是std::move
+
+== 待探讨
+
+. {cpp}23才有的
+.. to_underlying: 将枚举enum转换为底层类型enum
+. 不太懂
+.. 不懂使用场景的
+... tie,ignore
+... reference_wrapper, ref, cref:
+... variant
+... expected
+. 暂略
+.. std::bind, bind_front, bind_back:提到是多余的，一般可用lambda代替,暂略
+.. 时间库,对应std::chrono,有时间点，段，时钟三个部分,了解即可，需要的时候再查阅

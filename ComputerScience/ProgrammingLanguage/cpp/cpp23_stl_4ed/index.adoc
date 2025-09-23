@@ -1,0 +1,59 @@
+= C++23标准库第四版
+:toc: left
+:toc-title: 目录
+:toclevel: 2
+
+====
+此书写的深度不太够，内容编排也不紧密，知识点深浅不一，很多时候没有写使用场景，我比较关心哪些实际用的多，能用到，和应该关心的点在哪里，都写得太泛
+
+个人评价：
+
+. 不是一本好书，略读即可，里面有一些表格倒是可以看看,能解决一些“有哪些”，“是什么”的问题，"如何用"太简略，"实不实用(使用场景)"基本没提，"注意点"很少提，流水帐了
+. "有哪些"和"是什么"这俩问题根本没多大价值买书，一个cpp reference就说的明明白白，开发者普遍关心的使用场景和注意点才是重点
+. 本着读书尽量取其精华，按需求阅读的原则，还是速读了一遍
+. 目测不如《{cpp}标准库(第二版)》，虽然此书版本只到11,但是基本也够用了
+====
+
+:leveloffset: +1
+
+include::ch1.adoc[]
+
+include::ch2.adoc[]
+
+include::ch3.adoc[]
+
+include::ch4.adoc[]
+
+include::ch5.adoc[]
+
+include::ch6.adoc[]
+
+include::ch7.adoc[]
+
+include::ch8.adoc[]
+
+include::ch9.adoc[]
+
+include::ch10.adoc[]
+
+include::ch11.adoc[]
+
+include::ch12.adoc[]
+
+include::ch13.adoc[]
+
+include::ch14.adoc[]
+
+include::ch15.adoc[]
+
+include::ch16.adoc[]
+
+include::ch17.adoc[]
+
+include::ch18.adoc[]
+
+include::ch19.adoc[]
+
+include::ch20.adoc[]
+
+:leveloffset: -1

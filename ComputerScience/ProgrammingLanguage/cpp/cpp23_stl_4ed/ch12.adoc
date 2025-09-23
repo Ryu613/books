@@ -1,0 +1,5 @@
+= 第十二章 数值
+
+. 随机数: 在<random>里，此处暂略
+.. 数学常数: 在<numbers>里，std::numbers::(常数名)
+image::img/numbers.png[]

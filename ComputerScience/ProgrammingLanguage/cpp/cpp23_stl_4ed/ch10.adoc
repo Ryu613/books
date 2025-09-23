@@ -1,0 +1,44 @@
+= 第十章 算法
+
+. 通用算法在<algorithm>, <numeric>主要是数值相关的算法
+. {cpp}有执行策略(std::execution)，可指定算法按顺序，还是并行，还是向量化并行执行,在支持的算法函数的第一个参数，可以省略
+.. 注意并行STL是否可用要看编译器，MSVC 2023以后可直接用，GCC/CLANG要安装TBB
+.. std::execution::seq(串行), par(在多个线程上并行), par_unseq(不按顺序的并行，允许SIMD)
+
+. std::for_each, for_each_n({cpp}17以上，可对前n个元素应用func)，可修改元素
+. std::find, find_if, find_if_not, find_first_of, adjacent_find（范围内相同的相邻元素）: 搜索成功返回一个迭代器，若不成功则范围结束的迭代器(end()),不能修改元素
+. std::count, count_if(带条件计数)
+. 范围检查: std::all_of, any_of, none_of
+. 范围比较(范围内的元素是否都相等): std::equal，还有检查范围大小: std::lexicographical_compare等
+. 范围搜索: std::search(从一个范围的开头开始搜索), find_end(从尾巴开始搜索), search_n(范围内连续的n个元素)
+. 范围复制: std::copy, copy_backward(从尾巴倒着范围复制), copy_if(按条件复制范围),copy_n(复制n个元素)
+. 范围替换: replace, replace_if, replace_copy(替换并复制原值), replace_copy_if: 用法同上
+. 范围删除: remove, remove_if, remove_copy(删除并复制原值), remove_copy_if
+. 范围填充: fill, fill_n
+. 范围生成: generate, generate_n
+. 范围交换: swap, swap_ranges
+. 范围变换: transform(将某个范围内的元素使用某个调用)
+. 范围倒转：reverse,reverse_copy(范围内元素颠倒顺序,并把原来的元素返回)
+. 范围旋转: rotate, rotate_copy(横向的滚动字幕见过吗，就是把所有元素后移n个位置，后面的从前面进来)
+. 范围移动: shift_left,shift_right(往左还是往右移动一个范围的元素，返回这个范围起始位置的前向迭代器)
+. 范围洗牌:random_shuffle(要传入一个随机数生成器), shuffle(使用均匀随机数生成器完成洗牌)，用shuffle,random_shuffle已被启用(因其内部用的C函数rand)
+. 删除**相邻**且重复元素: unique, unique_copy
+. 分区(partition): 把某个容器的元素根据某种方法分成若干子集合
+. 排序: sort, stable_sort, partial_sort: 找其他资料看，暂略
+. 二分查找: binary_search从已排好序的容器里面，利用二分查找法，比起顺序搜索，能更快速地搜索某个元素
+. 范围合并: inplace_merge, merge, includes, set_difference, set_intersection等要求都是已排序的，并且排序的标准是一致的，主要就是对两个集合的交并差集进行操作
+. 堆: 二叉树，父元素总比子元素大，用于高效排序和搜索
+.. make_heap: 创建堆， push_heap:往堆上加新元素， pop_heap取出最大元素
+. 最小最大: 返回范围内按自定义的算法确认出来的最小最大值: min_element,max_element,minmax_element
+. 排列: prev_permutation, next_permutation: 返回新排序范围里，前一个或后一个较大的排列，用这个算法可以生成范围内的所有排列(不太懂意思)
+. 数值算法
+.. 累加: accumulate
+.. 相邻元素差值: adjacent_difference
+.. 范围内的部分和: partial_sum
+.. 范围内积(标量积): inner_product
+.. 为范围内的每个元素赋予一个依次递增的值: iota
+. 新并行算法(不太懂，需要再找资料看看)
+.. reduce: 减少范围内元素,范围可能会重新排列， transform_reduce: 转换并归约
+.. 其他，暂略
+. 未初始化的内存操作,在<memory>里，此处略
+

@@ -6,4 +6,9 @@
 4. 管线创建后，要绑定指令缓冲
 5. shader不直接读写资源，其通过Descriptor Set完成此类操作
 6. Descriptor Set 是绑定在管线上的一组资源，一个管线可对应多个Descriptor Set
-7. Descriptor Set由多个Descriptor组成，其又从Descriptor Pool里分配，还需绑定到command buffer,以便对descriptor表示的资源进行操作
+
+## shader中的资源访问
+
+shader里面的资源(即texture，sampler，buffer等)要通过descriptor set访问，descriptor set通过set的序号分组，每组里面又根据binding序号进行编号
+
+descriptor set layout就负责对你shader里面用到的资源的set和binding序号和资源类型进行确定，这个layout是可以复用的，具体资源不同，但只要set,binding,type一致即可

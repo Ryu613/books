@@ -1,0 +1,17 @@
+= 实时渲染技术第四版
+:toc: left
+:toc-title: 目录
+:toclevels: 2
+
+====
+译注:
+* pipeline: 只有特指rendering pipeline时叫渲染管线，其他情况叫流水线
+
+此翻译暂停，太费时间了，直接看总结版
+====
+
+:leveloffset: +1
+
+include::ch2.adoc[]
+
+:leveloffset: -1

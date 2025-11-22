@@ -1,0 +1,107 @@
+= modern cmake second edition
+
+== main phase
+
+=== configure
+
+. read CMakeCache.txt
+. parse & exec CMakeLists.txt
+. write initial build tree and CMakeCache.txt
+
+=== Generate
+
+generate makefiles and project files
+
+=== build
+
+compile, link, test, package
+
+== terms
+
+. listfiles: files that contains cmake language, typically with .cmake suffix
+. modules: find modules or utility modules, which included officially or can be manually included(see: official docs, github:awesome-cmake)
+. package definition files: libs or tools which project can depend on, use <Packagename>-config.cmake(or <Packagename>Config.cmake) to define
+. source/build tree: structure meta info of source/build files, can be defined by -S/-B, source files are user-defined, while build files are cmake generated
+
+== conventions
+
+. use .cmake means cmake listfiles
+
+
+== executable files
+
+. cmake.exe: config, gen, build project
+. ctest.exe: run, report test
+. cpack.exe: gen installers & source packages
+. ccmake.exe: unix-like text user interface(not available on Windows by default)
+
+== core commands
+
+. -S <source path> -B <build path>
+. -D<var>[:<type>]=<val>
+.. type: BOOL, FILEPATH, PATH, STRING, INTERNAL(implies FORCE, use by system not user),UNINITIALIZED(not defined and cannot find this var in CMakeCache.txt)
+. --build
+. --install <build path>
+. -P: run cmake script(by convention, file with .cmake suffix) without conf & gen phase
+. -E: run CMD commands
+
+== core cmake funcs
+
+. cmake_minimum_required(): implicitly add policy base on VERSION
+. project(): set vars like PROJECT_NAME, CMAKE_PROJECT_NAME(top level only), PROJECT_SOURCE_DIR, etc..
+.. 
+. add_subdirectory(): EXCLUDE_FROM_ALL: disable auto building of targets in this subdirs
+. set_target_properties() PROPERTIES keyword can be replaced of several vals,see official docs
+.. set_property() is advanced func which can set TARGET and more, see docs
+. target_compile_definitions(): source/destination target use/not use this defs.
+.. INTERFACE: only in headers and not used by cpp
+. target_link_libraries(): receive propagated vars, and determines this target use/not use this vars by declaring PUBLIC/PRIVATE/INTERFACE
+.. WARNING: custom properties will not propagate by default, must append props to COMPATIBLE_INTERFACE_<type> to enable propagation
+
+
+== core vars
+
+. CMAKE_BUILD_TYPE： is a STRING type
+.. Debug(default)
+.. Release
+.. MinSizeRel
+.. RelWithDebInfo
+
+== misc
+
+=== debug
+
+==== config & gen phase
+. -L: list cached vars(typed -D vars(must have types, will not show if not!))(-LH: with helpful msgs)
+. -U: unset vars of -D
+. -system-information: print cached vars and other sys info for debug use
+. --log-level, --log-context, --trace
+
+=== build commands
+
+. --fresh: clean & build(warning: diff from manually delete built files! depends version & policy)
+. --target(-t): define build target, -t clean: remove compiled files, --clean-first: clean & build
+. -paralled(-j): define paralled number of jobs(WARNING: some people say not recommended to set on Internet)
+. --verbose(-v): debug building msgs
+
+=== install
+
+. -v(--verbose): debug install msgs
+. --install-prefix
+. --default-directory-permissions <permissions>
+
+== worthly mentions
+
+. enable IPO optimization
+. visualize dependencies with "--graphviz=<filename>.dot"
+. pseudo targets: omitted this episode since not useful for now
+
+=== other
+
+. --workflow <preset>
+. --config <file path>
+. comments: #(one line), #[=[<content> #]=] (can be nested)
+
+== questions
+
+. -B vs --build: use -B build buildtree then --build to compile from that buildtree, not the same!

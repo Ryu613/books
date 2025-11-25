@@ -95,6 +95,9 @@ compile, link, test, package
 . enable IPO optimization
 . visualize dependencies with "--graphviz=<filename>.dot"
 . pseudo targets: omitted this episode since not useful for now
+. generator expression: omitted
+. target_precompile_headers() : compile a pch header for target to reduce compile time
+.. REUSE_FROM can reuse config of pch to other target
 
 === other
 

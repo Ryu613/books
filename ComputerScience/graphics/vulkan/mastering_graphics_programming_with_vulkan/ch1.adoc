@@ -1,0 +1,31 @@
+= ch1
+
+== essential point of views
+
+. Sokol(not support Vulkan) and BGFX(too generic and fledged)
+. Raptor Engine is based on Hydra Engine(small & simple, familliarity, vulkan, modularized)
+.. layer based, means a layer can only interact with lower ones to simplify api design
+... each chapter has its one implementations of graphics layer
+. Raptor's 3 layers
+.. foundation
+... mem alloc
+... containers: array(explicit allocator needed), hashmap(abseil)
+... file: file operations
+... serialization: fundamental step, also call asset baking, speed up loading files
+... logging
+... string processing: efficiently store and track inside a contiguous & fix-sized chunk of mem
+... time management
+... process execution: running external programs
+.. graphics: GpuDevice is main class
+.. application
+. 
+
+== questions
+
+. is it necessary to write mem allocator by self instead of 3rd party's? tlsf?
+.. ref: game engine architecture 3ed - 6.2
+... Loki(modern C++ Design), Folly, Boost
+. serialization, why & how, in detail
+. customizing string? still necessary nowadays?
+. can time.cpp be replaced by std::high_resolution_clock? 
+. process execution, why & how, still necessary nowadays?

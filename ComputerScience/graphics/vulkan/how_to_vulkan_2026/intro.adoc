@@ -1,0 +1,24 @@
+= 介绍
+
+. 以Vulkan1.3为基准，会使用四个特性
+* dynamic rendering: 极大地简化render pass的配置，也是备受批判的部分
+* buffer device address: buffer可以不用descriptor来访问，而是用指针访问
+* descriptor indexing: 简化descriptor的管理，也称为"bindless"
+* synchronization2: 优化了同步的处理，是vulkan里最难的部分
+
+== 步骤
+
+. 创建instance: API版本，启用哪些扩展
+. 枚举设备(GPU): 根据使用的feature和扩展来选，虽然一般是第一个，但是最好还是枚举并检测扩展和特性的支持情况后，再选择
+.. 选择queue family: 一般需支持graphics和present,并记录这个queue family的句柄
+.. 从queue family中请求queue： 由于可同时请求多个queue，要给优先级
+. 配置设备(GPU): 从特性，扩展，queue family相关能力都支持的设备里，选出要使用的一个设备,创建device,并记录要使用的queue的句柄
+. 设置vma: 把必要的vulkan句柄传进去，创建vma
+. 创建swapchain: 确定并设置各种swapchain相关的属性
+
+== 要点
+
+. 一般graphics和present支持都在同一个queue family中，如果不在，需要额外在这些队列间作同步
+. queue用来提交其支持的指令
+. swapchain里面的image是被swapchain自己拥有，外部不能直接访问，会被swapchain自己创建，image的数量与创建时给定的minImageCount有关
+. image不能直接访问，要通过image view

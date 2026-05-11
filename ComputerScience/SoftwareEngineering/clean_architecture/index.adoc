@@ -1,0 +1,18 @@
+= 架构整洁之道
+:toc: left
+:toc-title: 目录
+:toclevels: 2
+
+:leveloffset: +1
+
+include::part1.adoc[]
+
+include::part2.adoc[]
+
+include::part3.adoc[]
+
+include::part4.adoc[]
+
+include::part5.adoc[]
+
+:leveloffset: -1

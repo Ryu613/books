@@ -3,6 +3,11 @@
 :toc-title: 目录
 :toclevels: 2
 
+====
+自提炼内容:
+link:summary.adoc[总结文档]
+====
+
 :leveloffset: +1
 
 include::part1.adoc[]
@@ -14,5 +19,7 @@ include::part3.adoc[]
 include::part4.adoc[]
 
 include::part5.adoc[]
+
+include::part6.adoc[]
 
 :leveloffset: -1

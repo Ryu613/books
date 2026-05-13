@@ -1,0 +1,12 @@
+= 游戏编程模式
+:toc: left
+:toc-title: 目录
+:toclevels: 2
+
+:leveloffset: +1
+
+include::part1.adoc[]
+
+include::part2.adoc[]
+
+:leveloffset: -1

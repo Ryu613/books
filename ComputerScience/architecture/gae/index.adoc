@@ -1,0 +1,10 @@
+= 游戏引擎架构
+:toc: left
+:toc-title: 目录
+:toclevels: 2
+
+:leveloffset: +1
+
+include::part2.adoc[]
+
+:leveloffset: -1

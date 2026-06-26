@@ -1,4 +1,4 @@
-= 第30章 支持过度对齐的new和delete
+= 第30章 支持过对齐的new和delete
 
 > 过度对齐，即可使数据的对齐尺寸超过std::max_align_t对齐值(WINDOWS上是8，其他平台为8或16)
 

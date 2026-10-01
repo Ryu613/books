@@ -1,0 +1,9 @@
+= Game Engine Architecture 3ed
+:toc: left
+:toc-title: 目录
+
+:leveloffset: +1
+
+include::ch7.adoc[]
+
+:leveloffset: -1

@@ -1,0 +1,15 @@
+= {cpp}并发编程实战第二版
+:toc: left
+:toc-title: 目录
+:toclevel: 2
+
+====
+此书隐性前置需求: 可补充深入理解计算机系统, 现代操作系统的对应章节
+====
+
+:leveloffset: +1
+
+include::ch1.adoc[]
+include::ch2.adoc[]
+
+:leveloffset: -1

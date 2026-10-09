@@ -4,6 +4,8 @@
 
 :leveloffset: +1
 
-include::ch7.adoc[]
+//include::ch7.adoc[]
+
+include::part2.adoc[]
 
 :leveloffset: -1

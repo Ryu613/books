@@ -1,0 +1,385 @@
+= vk guide
+:toc:
+
+link:https://docs.vulkan.org/guide/latest[src page]
+
+this document is hand written in order to gain genuine understanding, not by AI
+
+using English because I'm practicing it, so there maybe some error.
+
+====
+* 重点:
+. profiling
+. synchronization
+. memory allocation
+* 有价值:
+. vulkan profile: 用于自动启用layer, extension, feature, 避免写一大堆检测，启用，回退代码
+. vkCmdBegin(end)DebugUtilsLabelEXT to set cmd buffer labels
+. pipeline dynamic state
+. common pitfalls
+. atomics
+* 可参考:
+. dev tools: Nsight, renderDoc, Vktracer, GFXReconstruct, 其他gpu调试工具
+* 待回看:
+. synchronization
+. memory allocation
+. pipeline cache
+. threading
+. mapping data to shaders
+. shader memory layout
+. image copies
+====
+
+== usage
+
+. graphics rendering
+.. vulkan is designed to create hardware accelerated graphical app
+. gpu computation
+.. support gpgpu(GPU通用计算)
+. ray tracing
+.. since spec 1.2.162
+. video decoding
+.. hardware accelerated video decoding
+. machine learning
+.. for now, no public api to support ml, but it can be in the future
+. safety critical(Vulkan SC)
+.. automotive(汽车),avionics(航天), industrial, medical
+
+== specification
+
+the offical website only contains latest version
+
+useful links below:
+
+. link:https://docs.vulkan.org/spec/latest/index.html[spec latest]
+. link:https://registry.khronos.org/vulkan/specs[按版本分]
+. link:https://vulkan.lunarg.com/doc[vulkan sdk]
+
+== platform
+
+support many platforms
+
+macOS, iOS not natively supported, but can be converted by Vulkan Portability Tools.
+
+some embedded systems support vulkan
+
+== vulkan profile
+
+auto enable necessary extensions, layers, features, reduce manually checking and write fallback code. sounds good!
+
+cons:
+
+. init overhead: parsing json, loading profile
+. mem usage: small amount of memory
+. unused features: may have slight performance impact in some situations
+
+== dev tools
+
+. link:https://docs.vulkan.org/guide/latest/development_tools.html[]
+
+
+. VK_LAYER_KHRONOS_validation: validation layers by LunarG
+. VK_LAYER_LUNARG_api_dump: dump api calls
+. VK_LAYER_LUNARG_gfxreconstruct: capture frames
+. VK_LAYER_LUNARG_device_simulation: test whether a Vulkan application would run on a Vulkan device with lower capabilities
+. VK_LAYER_LUNARG_screenshot: Captures the rendered image of a Vulkan application to a viewable image
+. VK_LAYER_LUNARG_monitor: Display the Vulkan application FPS in the window title bar, only compatible with the Win32 and XCB windowing systems
+
+== dev env & ides
+
+. renderdoc
+. Nsight(NVIDIA)
+. RGP(AMD)
+. GPA(Intel)
+. Vktracer/GFXReconstruct(cross-vendor profiling)
+
+=== shader debug
+
+gpu-assisted validation: enable validation features when creating instance
+
+==== shader printf
+
+. link:https://docs.vulkan.org/guide/latest/ide.html#_shader_debugging_tools[shader tools]
+
+== profiling
+
+this part is one of the most valuable things in vulkan docs
+
+link:https://docs.vulkan.org/guide/latest/profiling.html[profiling reference]
+
+. use vkSetDebugUtilsObjectNameEXT to name a vulkan object
+. use vkCmdBegin(end)DebugUtilsLabelEXT to set cmd buffer labels
+. use VkQueryPool to capture accurate hardware timestamps on the gpu timeline
+
+=== cpu bottlenecks
+
+* link:https://docs.vulkan.org/guide/latest/profiling.html#_cpu_side_bottlenecks[cpu bottlenecks]
+
+. command recording overhead
+.. **use secondary cmd buffer**: parallelize recording commands across multiple cpu threads
+.. **sort draw calls**: reduce overhead usage of vkCmdBindPipeline, since it triggers internal driver state updates(performance impact)
+.. **use descriptor indexing or buffer or heap**: reduce high cpu time on calling vkUpdateDescriptorSets
+. submission and synchronization
+.. **batch submit command buffers**: vkQueueSubmit has a high fixed cost. don't prequently submit small amounts of work
+.. **avoid device and queue wait idle in main loop**: forcing cpu wait until gpu is completely empty. **use a ring buffer of fences** to track frame completion, and keep the gpu fed with work for future frames
+
+=== gpu bottlenecks
+
+when frame time is dominated by GPU execution rather than cpu wait time
+
+==== hardware metrics
+
+. occupancy: ratio of active "warps" or "wavefronts"(groups of threads)
+.. low occupancy often means shaders are **using too many registers**, preventing the gpu from hiding latency
+. stalls: occurs when gpu's execution units(ALUs) are waiting for data
+.. memory stall: waiting for data to arrive from VRAM or L2 cache
+.. execution stall: waiting for a previous instruction to finish(e.g. a long-latency math operation)
+. bandwidth utilization(带宽利用率): high utilization of the memory controller indicates "memory bound"
+
+==== common gpu issues
+
+. vertex bound: too many vertices or inefficient vertex fetch, use **VK_EXT_mesh_shader** to replace traditional vertex pipeline if geometry is the bottleneck
+. frag bound(fill rate): high overdraw is the most common cause
+.. early-z
+.. overdraw analysis: use renderdoc's overdraw overlay to find areas where the same pixel is shaded multiple times
+. bandwidth bound: caused by large, uncompressed textures, or too many render target attachments
+.. use texture compression(ASTC, BCn)
+.. use VK_ATTACHMENT_LOAD_OP_CLEAR instead of manual vkCmdClearColorImage to allow the hardware to optimize memory bandwidth
+
+==== syncrhonization bubbles
+
+bubble means a period where the GPU is idle because it is waiting for a synchronization dependency that hasn't been met yet.
+
+. use Nsight/RGP etc to show the GPU timeline, if you see large gaps between workloads where no queues are active, you have a bubble
+. root causes:
+.. restrictive barriers: over restrictive barrier like VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, forces wait for all previous work to finish before starting next task
+.. cpu-gpu sync: cpu submitting not fast enough, or cpu is waiting for a fence too early
+
+=== choosing the right tools
+
+. api, system-level tracing: Nsight, RGP, AGI, Vktracer
+. hardware profilers: vendor provides these, e.g. Nvidia's Nsight, arm, qualcomm etc.
+. frame debuggers: renderdoc
+
+=== pipeline integration
+
+for CI/CD to catch regressions
+
+. repeatable captures: GFXReconstruct to record frames
+. Headless replay: replay capture in CI env
+. metrics extraction: capture hardware metrics to compare the result with baseline
+
+=== further reading
+
+. link:http://github.com/KhronosGroup/Vulkan-Samples/tree/main/samples/performance[vulkan-samples performance]
+. link:https://gpuopen.com/learn/vulkan-barriers-explained/[vulkan barriers explained]
+. link:https://developer.nvidia.com/blog/vulkan-dos-donts/[vulkan dos and don'ts] 
+
+== concept mapping across other gapis
+
+useful for understanding RHI
+
+link:https://docs.vulkan.org/guide/latest/decoder_ring.html[decoder ring]
+
+== loader
+
+=== what is loader
+
+The loader is critical to managing the proper dispatching of Vulkan functions to the appropriate set of layers and drivers
+
+. Support one or more Vulkan-capable drivers on a user's system without them interfering with one another
+. Support Vulkan Layers which are optional modules that can be enabled by an application, developer, or standard system settings
+. Keep the overall overhead of the loader to the minimum possible
+
+=== loader linking
+
+vulkan sdk provides a pre-built loader for Windows
+
+. directly linking
+.. dynamic(连接到一个dll): the loader is a dynamic library, e.g. "dll" on windows, "so" on linux, etc.
+... applications can usually expect a copy of the loader to be present on a system(windows, linux)
+...  If applications want to be completely sure that a loader is present, they can include a loader or runtime installer with their application
+.. static: **This was removed and is no longer possible**
+... because of changes to the driver which made older applications that statically linked unable to find newer drivers
+... The loader can never be updated without re-linking the application
+... Could cause conflicts between the different loader versions across different libraries
+. indrectly linking(只导出函数到dispatch table，库在编译时动态检测并链接): apps can use the appropriate platform-specific dynamic symbol lookup on the loader library to initialize the application's own dispatch table
+.. allows an application to fail gracefully if the loader cannot be found
+.. provides the fastest mechanism for the application to call Vulkan functions
+
+== extensions
+
+.two types:
+. instance extensions: instance scope
+. device extensions: device scope
+
+== features
+
+means physical device's features
+
+== queues
+
+* commands sumbmitted in order, but can process independently and out of order
+* commands in different queues are inrelative, unless using VkSemaphore to sync
+* operation of submitting to queue is serial, but can submit to different queue simultaneously
+* VkQueue cannot expose details of mapped hardware implementations, it's depends on GPU implementations
+* not all app's will require or benefit from multiple queues, check specific gpu's manual!
+
+== queue family
+
+* a set of VkQueues that have common props and support the same functionality
+
+=== queue usage
+
+稀疏资源(TBD): https://docs.vulkan.org/spec/latest/chapters/sparsemem.html
+
+. VK_QUEUE_GRAPHICS_BIT: used for vkCmdDraw* and graphics pipeline commands
+. VK_QUEUE_COMPUTE_BIT: used for vkCmdDispatch* and vkCmdTraceRays* and compute pipeline related commands
+. VK_QUEUE_TRANSFER_BIT: use for transfer commands
+.. Queue Families with only VK_QUEUE_TRANSFER_BIT are usually for using DMA to asynchronously transfer data between host and device memory on discrete GPUs, so transfers can be done concurrently with independent graphics/compute operations
+. VK_QUEUE_SPARSE_BINDING_BIT: use for bind sparse resources
+. VK_QUEUE_PROTECTED_BIT
+. and queue for video decoding, see reference doc
+
+== WSI
+
+* https://docs.vulkan.org/guide/latest/wsi.html
+
+when users need present images on screen, vulkan regard presentation extensions as optional, should be manually enable them
+
+* VkSurfaceKHR: abstraction of **presentation target(能够把渲染结构送到那里的目标，窗口只是其中一种)** on platforms, depends on platform, see reference doc
+* VkSwapchainKHR: abstraction of **a set of images use for presentation**, it provides the ability to present rendering results to a surface through an array of VkImage objects
+
+== windowing
+
+performance considerations:
+
+* minimize window resizing: recreate swapchain is expensive
+* batch input processing: processing all input events at once rather than handling them individually
+* use double buffering: for audio, to ensure smooth playback while preparing the next audio segment
+
+== synchronization
+
+this section is valuable, should revisit after complete other books
+
+. https://docs.vulkan.org/guide/latest/synchronization.html
+. https://www.khronos.org/blog/understanding-vulkan-synchronization
+. https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples
+
+. cross command buffer: VkEvent
+. cross queue: VkSemaphore
+. between CPU and GPU: VkFence
+. cross pipeline stages: VkPipelineBarrier
+
+* VK_KHR_synchronization2: Vk 1.3 extension, overhauls the original core synchronization APIs to reduce complexity for application developers, as well as adding a few additional features not present in the original APIs
+** https://docs.vulkan.org/guide/latest/extensions/VK_KHR_synchronization2.html
+
+== memory allocation
+
+this section is valuable, should revisit after complete other books
+
+. sub-allocation
+. transfer
+. lazily allocated memory
+. BDA(and alignment)
+
+== pipeline cache
+
+* https://docs.vulkan.org/guide/latest/pipeline_cache.html
+
+this section is valuable, should revisit after complete other books
+
+== threading
+
+* https://docs.vulkan.org/spec/latest/chapters/fundamentals.html#fundamentals-threadingbehavior
+
+this section is valuable, should revisit after complete other books
+
+* multithreading in Vulkan only provides host-side scaling, as anything interacting with the device still needs to be synchronized correctly
+* Vulkan implementations are not supposed to introduce any multi-threading, so if an app wants multi-CPU performance, the app is in charge of managing the threading
+
+* command pool: must not be accessed simultaneously from multiple threads
+** By using a separate command pool in each host-thread the application can create multiple command buffers in parallel without any costly locks
+* descriptor pool: By creating multiple descriptor pools, each application host thread is able to manage a descriptor set in each descriptor pool at the same time
+
+== depth
+
+an explaination of term "depth"
+
+== primitive topology
+
+an explaination of primitive types
+
+== mapping data to shaders
+
+this section is valuable due to many tutorials don't efficiently illustrate these important relations between apis and shader codes, should revisit after complete other books
+
+== robustness
+
+how to avoid UB in vulkan, it's valuable but optional for now
+
+== shader abort
+
+optional, read when need
+
+* VK_KHR_shader_abort: provides a GPU style assert() to help debug your shaders with simple setup
+
+== pipeline dynamic state
+
+pipeline dynaic state in detail, optional for now
+
+== compute shaders
+
+not a "how to" guide, optional
+
+== subgroups
+
+optional
+
+group of invocations that run the same instruction at once,Subgroups allow for a shader writer to work at a finer granularity than a single workgroup
+
+== shader memory layout
+
+this section is valuable, should revisit after complete other books
+
+== atomics
+
+vulkan atomics operations, optional for now
+
+== image copies
+
+this section is valuable, should revisit soon
+
+== common pitfalls
+
+this section is worth to read
+
+* [x] always enable validation layers when develop
+* [ ] There is rarely a “perfect” solution and obsessing over finding one is often a fruitless effort
+. try to create an adequate solution that meets the current needs and isn’t overly convoluted
+. While the specification for Vulkan can be useful, it isn’t the best source for how to use Vulkan in practice
+. reference external sources, like this guide, hardware best practice guides, tutorials, and other articles for more in-depth information
+. profiling various solutions is an important part of discovering which solution to use
+* [ ] command buffer re-using may have no performance benefit for now(not as some old tutorials tells), it's not that simple! additionally, the implementation of re-use increase the complexity of development, because draw calls with dynamic scene objects lets computed data varies.
+** prefer to re-record command buffers every frame is more adequate
+** if performance is a problem, recording with multithreaded, as well as using secondary command buffers for non-variable draw calls, e.g. post-processing
+* optimize pipeline creating and swapping only when needed. it depends on how complexity of rendering and scene
+* do not duplicate resources for each swapchain's image, it's flexible, some resource don't need that much as number of swapchain images
+* not necessary to use multiple queues in one queue family, it depends on hardware, see vendor's manual
+* descriptor set can be used not only one, vulkan spec mandates hardware support at least 4 at a time, as most hardware supporting at least 8(**so, how to manage ds set?**)
+
+== HLSL in vulkan
+
+optional
+
+== Slang in Vulkan
+
+maybe useful, but not now
+
+== shader language comparison
+
+for reference when needed, optional
+
+== when and why to use extensions
+
+for reference, optional

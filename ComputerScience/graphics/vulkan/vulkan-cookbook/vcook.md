@@ -253,5 +253,3 @@ Vulkan比起OpenGL来说能控制的细粒度更小，指令缓冲(command buffe
 使用vkWaitForFences()来阻断应用代码运行，至多阻断到超时时间，若在时间内满足fence通知条件(全部或其中之一已通知)，则会返回VK_SUCCESS,否则超时会返回VK_TIMEOOUT。若要检查栅栏的状态，只需把timeout值设置为0，这样，vkWaitForFences()不会阻断程序，并会直接返回当前栅栏的状态值，VK_TIMEOUT代表未通知，VK_SUCESS代表已通知
 
 栅栏在重用之前需要在代码中显式重置状态
-
-## 
